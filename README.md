@@ -11,7 +11,7 @@ O projeto abrange todo o ciclo de vida do acolhimento familiar, diagnósticos de
 
 ---
 
-## 📁 Estrutura do Repositório
+## Estrutura do Repositório
 
 ```text
 ├── 01_schema_ddl.sql                       # DDL Master: Tabelas, FKs, restrições, funções e triggers
@@ -23,7 +23,7 @@ O projeto abrange todo o ciclo de vida do acolhimento familiar, diagnósticos de
 
 ---
 
-## 🏛️ Arquitetura dos 7 Módulos (22 Tabelas)
+## Arquitetura dos 7 Módulos (22 Tabelas)
 
 O banco está organizado em 7 macro-módulos funcionais no schema `gestao_social`:
 
@@ -52,7 +52,7 @@ O banco está organizado em 7 macro-módulos funcionais no schema `gestao_social
 
 ---
 
-## 🚀 Como Executar o Projeto
+## Como Executar o Projeto
 
 ### Pré-requisitos
 * PostgreSQL 12 ou superior
@@ -69,7 +69,7 @@ Execute os arquivos SQL na ordem rigorosa abaixo:
 
 ---
 
-## 🔑 Credenciais de Demonstração (Seed Data)
+## Credenciais de Demonstração (Seed Data)
 
 | Usuário | Login | Senha | Perfil |
 | :--- | :--- | :--- | :--- |
@@ -79,7 +79,7 @@ Execute os arquivos SQL na ordem rigorosa abaixo:
 
 ---
 
-## 📊 Principais Views de Consulta
+## Principais Views de Consulta
 
 ```sql
 -- 1. Saldo Geral de Estoque e Alerta de Reposição
@@ -100,6 +100,6 @@ SELECT * FROM gestao_social.vw_historico_entregas_detalhado;
 
 ---
 
-## 📄 Documentação Técnica Completa
+## Documentação Técnica Completa
 
-Para detalhes aprofundados sobre regras de negócio, modelagem matemática, conformidade com a LGPD e respostas para bancas técnicas, consulte o arquivo [**`documentacao_sistema_gestao_social.pdf`**](./documentacao_sistema_gestao_social.pdf) ou o markdown [**`documentacao_sistema_gestao_social.md`**](./documentacao_sistema_gestao_social.md).
+Para detalhes aprofundados sobre regras de negócio, modelagem matemática, conformidade com a LGPD e respostas para bancas técnicas, consulte o arquivo [**`documentacao_sistema_gestao_social.pdf`**](./documentacao_sistema_gestao_social.pdf)
