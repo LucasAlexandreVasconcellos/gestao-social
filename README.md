@@ -17,7 +17,6 @@ O projeto abrange todo o ciclo de vida do acolhimento familiar, diagnósticos de
 ├── 01_schema_ddl.sql                       # DDL Master: Tabelas, FKs, restrições, funções e triggers
 ├── 02_views_triggers.sql                   # Views analíticas, alertas de estoque e painéis gerenciais
 ├── 03_seed_data.sql                        # Carga de demonstração inicial (100% idempotente)
-├── documentacao_sistema_gestao_social.md   # Especificação e arquitetura técnica detalhada
 ├── documentacao_sistema_gestao_social.pdf  # Manual técnico formatado para impressão/apresentação
 └── README.md                               # Este arquivo de apresentação
 ```
