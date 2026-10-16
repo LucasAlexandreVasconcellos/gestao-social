@@ -34,6 +34,7 @@
                 <option value="Estoque" <?= ($filters['entidade'] ?? '') === 'Estoque' ? 'selected' : '' ?>>Estoque / Movimentação</option>
                 <option value="Doacao" <?= ($filters['entidade'] ?? '') === 'Doacao' ? 'selected' : '' ?>>Doação</option>
                 <option value="ProjetoSocial" <?= ($filters['entidade'] ?? '') === 'ProjetoSocial' ? 'selected' : '' ?>>Projeto Social</option>
+                <option value="Relatorio" <?= ($filters['entidade'] ?? '') === 'Relatorio' ? 'selected' : '' ?>>Relatórios e Indicadores (LGPD)</option>
             </select>
         </div>
         <div class="form-group" style="margin-bottom: 0; min-width: 200px;">
@@ -46,6 +47,8 @@
                 <option value="ENTREGA" <?= ($filters['operacao'] ?? '') === 'ENTREGA' ? 'selected' : '' ?>>Entrega Efetivada</option>
                 <option value="MOVIMENTACAO" <?= ($filters['operacao'] ?? '') === 'MOVIMENTACAO' ? 'selected' : '' ?>>Movimentação de Estoque</option>
                 <option value="DESVINCULACAO" <?= ($filters['operacao'] ?? '') === 'DESVINCULACAO' ? 'selected' : '' ?>>Desvinculação Histórica</option>
+                <option value="CONSULTA_RELATORIO" <?= ($filters['operacao'] ?? '') === 'CONSULTA_RELATORIO' ? 'selected' : '' ?>>Consulta de Relatório</option>
+                <option value="EXPORTACAO_CSV" <?= ($filters['operacao'] ?? '') === 'EXPORTACAO_CSV' ? 'selected' : '' ?>>Exportação CSV (LGPD)</option>
             </select>
         </div>
         <button type="submit" class="btn btn-secondary">Filtrar Logs</button>
@@ -99,6 +102,8 @@
                                             'ENTREGA' => 'badge-primary',
                                             'DESVINCULACAO' => 'badge-warning',
                                             'CANCELAMENTO' => 'badge-danger',
+                                            'CONSULTA_RELATORIO' => 'badge-info',
+                                            'EXPORTACAO_CSV' => 'badge-warning',
                                             default => 'badge-secondary'
                                         };
                                     ?>

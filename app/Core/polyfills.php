@@ -35,3 +35,10 @@ if (!function_exists('mb_strimwidth')) {
         return substr($string, $start, max(0, $width - strlen($trimMarker))) . $trimMarker;
     }
 }
+
+if (!function_exists('mb_substr')) {
+    function mb_substr(string $string, int $start, ?int $length = null, ?string $encoding = null): string {
+        return $length === null ? substr($string, $start) : substr($string, $start, $length);
+    }
+}
+

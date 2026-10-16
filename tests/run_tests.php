@@ -490,6 +490,48 @@ $t->run('RBAC: Controle de acesso e autorização por perfil de usuário', funct
     $t->assert(!$consulta->can('beneficios.create'), 'Consulta NÃO pode criar entregas');
 });
 
+$t->run('LGPD & Anonimização: Mascaramento de dados pessoais (Art. 13 da LGPD)', function() use ($t) {
+    // Pseudonimização de nomes
+    $nome = 'Maria de Souza Silva';
+    $anonimizado = \App\Helpers\FormatHelper::anonymizeName($nome);
+    $t->assert(str_contains($anonimizado, 'M.') && str_contains($anonimizado, 'S.'), 'Deve conter iniciais das palavras');
+    $t->assert(!str_contains($anonimizado, 'Souza'), 'Não deve exibir sobrenome em texto claro');
+    $t->assert(str_contains($anonimizado, 'LGPD'), 'Deve carregar indicador de conformidade LGPD');
+
+    // Mascaramento de CPF
+    $cpf = '12345678901';
+    $maskedCpf = \App\Helpers\FormatHelper::maskCpf($cpf);
+    $t->assertEquals('***.456.789-**', $maskedCpf, 'CPF deve ser mascarado preservando apenas dígitos centrais');
+});
+
+$t->run('RelatorioService: Consolidação de indicadores gerenciais socioassistenciais', function() use ($t) {
+    /** @var \App\Services\RelatorioService $service */
+    $service = \App\Core\Container::resolve(\App\Services\RelatorioService::class);
+    $indicadores = $service->obterIndicadoresGerais();
+
+    $t->assert(isset($indicadores['totalFamilias']), 'Deve retornar total de famílias');
+    $t->assert(isset($indicadores['totalPessoas']), 'Deve retornar total de pessoas');
+    $t->assert(isset($indicadores['criancasInfancia']), 'Deve retornar quantitativo de crianças');
+    $t->assert(isset($indicadores['totalEntregas']), 'Deve retornar total de entregas');
+    $t->assert(isset($indicadores['totalEstoque']), 'Deve retornar total de itens no almoxarifado');
+    $t->assert($indicadores['totalFamilias'] >= 0, 'Total de famílias deve ser não-negativo');
+});
+
+$t->run('Auditoria & Rastreabilidade LGPD: Registro de visualização e exportação de relatórios', function() use ($t) {
+    /** @var \App\Services\AuditLogService $auditService */
+    $auditService = \App\Core\Container::resolve(\App\Services\AuditLogService::class);
+    
+    // Simula log de consulta
+    $auditService->log('CONSULTA_RELATORIO', 'Relatorio', 'familias', 'Consulta teste de relatório LGPD');
+    $logs = $auditService->listarTodos(['entidade' => 'Relatorio', 'operacao' => 'CONSULTA_RELATORIO']);
+
+    $t->assert(count($logs) > 0, 'Deve registrar e permitir filtro por entidade Relatorio');
+    $ultimo = $logs[0];
+    $t->assertEquals('CONSULTA_RELATORIO', $ultimo->operacao);
+    $t->assertEquals('Relatorio', $ultimo->entidade);
+});
+
 // Finaliza e imprime relatório
 $exitCode = $t->printSummary();
 exit($exitCode);
+

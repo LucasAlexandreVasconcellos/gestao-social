@@ -141,6 +141,60 @@ final class RelatorioService
         return $dados;
     }
 
+    public function obterIndicadoresGerais(): array
+    {
+        $familias = $this->familiaRepo->findAll();
+        $familiasAtivas = 0;
+        $familiasVulnerabilidadeAlta = 0;
+
+        foreach ($familias as $f) {
+            if ($f->situacaoCadastral === 'Ativa') {
+                $familiasAtivas++;
+            }
+            $avaliacao = $this->avaliacaoRepo->getUltimaAvaliacao($f->id);
+            if ($avaliacao && in_array($avaliacao->nivelVulnerabilidade, ['Alta', 'Crítica'], true)) {
+                $familiasVulnerabilidadeAlta++;
+            }
+        }
+
+        $faixas = $this->relatorioPessoasFaixaEtaria();
+        $totalPessoas = array_sum($faixas);
+        $criancasInfancia = ($faixas['0 a 6 anos (Primeira Infância)'] ?? 0) + ($faixas['7 a 14 anos (Crianças)'] ?? 0);
+        $idosos = $faixas['60 anos ou mais (Idosos)'] ?? 0;
+
+        $entregas = $this->beneficioRepo->findAll();
+        $entregasEfetivadas = 0;
+        foreach ($entregas as $e) {
+            if ($e->situacao === 'Efetivada') {
+                $entregasEfetivadas++;
+            }
+        }
+
+        $produtos = $this->estoqueRepo->findAllProdutos();
+        $totalEstoque = 0;
+        $estoqueCritico = 0;
+        foreach ($produtos as $p) {
+            $totalEstoque += $p->estoqueAtual;
+            if ($p->isEstoqueBaixo()) {
+                $estoqueCritico++;
+            }
+        }
+
+        return [
+            'totalFamilias' => count($familias),
+            'familiasAtivas' => $familiasAtivas,
+            'familiasVulnerabilidadeAlta' => $familiasVulnerabilidadeAlta,
+            'totalPessoas' => $totalPessoas,
+            'criancasInfancia' => $criancasInfancia,
+            'idosos' => $idosos,
+            'totalEntregas' => count($entregas),
+            'entregasEfetivadas' => $entregasEfetivadas,
+            'totalProdutos' => count($produtos),
+            'totalEstoque' => $totalEstoque,
+            'estoqueCritico' => $estoqueCritico
+        ];
+    }
+
     public function exportarCsv(array $cabecalhos, array $linhas, string $filename = 'relatorio.csv'): void
     {
         header('Content-Type: text/csv; charset=utf-8');
@@ -162,3 +216,4 @@ final class RelatorioService
         exit;
     }
 }
+

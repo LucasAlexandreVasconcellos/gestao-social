@@ -4,6 +4,11 @@
 /storage/logs/*
 !/storage/logs/.gitkeep
 
+# Arquivos de Ambiente e Credenciais
+.env
+.env.local
+.env.*.local
+
 # IDEs e Editores
 .vscode/
 .idea/

@@ -106,7 +106,10 @@ $router->post('/projetos/{id}/presenca', [ProjetoController::class, 'atualizarPr
 // Módulo 10 — Relatórios
 $router->get('/relatorios', [RelatorioController::class, 'index'], [AuthMiddleware::class]);
 $router->get('/relatorios/visualizar', [RelatorioController::class, 'view'], [AuthMiddleware::class]);
+$router->get('/relatorios/view', [RelatorioController::class, 'view'], [AuthMiddleware::class]);
 $router->get('/relatorios/exportar', [RelatorioController::class, 'export'], [AuthMiddleware::class]);
+$router->get('/relatorios/export', [RelatorioController::class, 'export'], [AuthMiddleware::class]);
+
 
 // Módulo 11 — Usuários, Permissões e Auditoria
 $router->get('/usuarios', [UsuarioController::class, 'index'], [AuthMiddleware::class]);

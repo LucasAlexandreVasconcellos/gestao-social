@@ -98,4 +98,60 @@ final class FormatHelper
 
         return '<span class="badge ' . $class . '">Vulnerabilidade ' . htmlspecialchars($level, ENT_QUOTES, 'UTF-8') . '</span>';
     }
+
+    public static function situacaoCadastralBadge(string $status): string
+    {
+        return self::badgeStatus($status);
+    }
+
+    public static function vulnerabilidadeBadge(string $level): string
+    {
+        return self::badgeVulnerability($level);
+    }
+
+    /**
+     * Pseudonimização / Mascaramento de dados pessoais em conformidade com o Art. 13 da LGPD
+     * Exemplo: "Maria de Souza Silva" -> "M. d. S. S." ou "M*** S***"
+     */
+    public static function anonymizeName(?string $name): string
+    {
+        if (empty($name)) {
+            return 'Identidade Preservada (LGPD)';
+        }
+
+        $parts = preg_split('/\s+/', trim($name));
+        if (count($parts) <= 1) {
+            $first = $parts[0] ?? '';
+            return (mb_strlen($first) > 0 ? mb_substr($first, 0, 1) . '***' : '***') . ' [LGPD]';
+        }
+
+        // Mantém as iniciais de cada nome para correlação técnica sem exposição nominal pública
+        $maskedParts = [];
+        foreach ($parts as $p) {
+            if (mb_strlen($p) > 0) {
+                $maskedParts[] = mb_strtoupper(mb_substr($p, 0, 1)) . '.';
+            }
+        }
+
+        return implode(' ', $maskedParts) . ' [LGPD]';
+    }
+
+    /**
+     * Mascaramento de CPF em conformidade com a LGPD
+     * Exemplo: "123.456.789-00" -> "***.456.789-**"
+     */
+    public static function maskCpf(?string $cpf): string
+    {
+        if (empty($cpf) || $cpf === 'Não informado') {
+            return 'Não informado';
+        }
+
+        $clean = preg_replace('/\D/', '', $cpf);
+        if (strlen($clean) !== 11) {
+            return '***.***.***-**';
+        }
+
+        return '***.' . substr($clean, 3, 3) . '.' . substr($clean, 6, 3) . '-**';
+    }
 }
+
