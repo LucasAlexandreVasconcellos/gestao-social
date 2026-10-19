@@ -32,17 +32,37 @@ ON CONFLICT (nome) DO NOTHING;
 -- 2. USUÁRIOS DE DEMONSTRAÇÃO (Idempotente via ON CONFLICT no login)
 -- -----------------------------------------------------------------------------
 INSERT INTO gestao_social.usuarios (nome, email, login, senha_hash, perfil_id) VALUES
-('Administrador Geral', 'admin@entidade.org.br', 'admin', 
- gestao_social.crypt('Admin@123', gestao_social.gen_salt('bf', 10)), 
+('Administrador Geral', 'admin@gestaosocial.org', 'admin', 
+ gestao_social.crypt('admin123', gestao_social.gen_salt('bf', 10)), 
  (SELECT id FROM gestao_social.perfis WHERE nome = 'Administrador')),
+
+('Administrador Institucional', 'admin@entidade.org.br', 'admin.entidade', 
+ gestao_social.crypt('admin123', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Administrador')),
+
+('Ana Paula Silva (Assistente Social)', 'social@gestaosocial.org', 'social', 
+ gestao_social.crypt('social123', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Assistente Social')),
 
 ('Maria Clara Santos', 'maria.clara@entidade.org.br', 'maria.social', 
  gestao_social.crypt('Social@123', gestao_social.gen_salt('bf', 10)), 
  (SELECT id FROM gestao_social.perfis WHERE nome = 'Assistente Social')),
 
+('Robson Almoxarife', 'estoque@gestaosocial.org', 'estoque', 
+ gestao_social.crypt('estoque123', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Estoque')),
+
 ('Carlos Eduardo Lima', 'carlos.estoque@entidade.org.br', 'carlos.estoque', 
  gestao_social.crypt('Estoque@123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Estoque'))
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Estoque')),
+
+('Fernanda Coordenadora', 'coordenacao@gestaosocial.org', 'coordenacao', 
+ gestao_social.crypt('admin123', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Coordenação')),
+
+('Juliana Recepção', 'atendimento@gestaosocial.org', 'atendimento', 
+ gestao_social.crypt('social123', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Atendimento / Recepção'))
 ON CONFLICT (login) DO NOTHING;
 
 -- -----------------------------------------------------------------------------

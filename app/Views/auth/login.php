@@ -31,8 +31,8 @@
 
       <div class="form-group" style="margin-bottom: 20px;">
         <label class="form-label" for="password">Senha de Acesso</label>
-        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" value="demo123">
-        <span class="form-help">Ambiente demonstrativo com autenticação pré-configurada.</span>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" value="admin123">
+        <span class="form-help">Padrão: <code>admin@gestaosocial.org</code> / <code>admin123</code> (ou acesse com 1 clique abaixo).</span>
       </div>
 
       <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 10px;">
@@ -42,15 +42,26 @@
 
     <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color);">
       <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; text-align: center;">
-        Acesso Rápido por Perfil (Modo Demo)
+        Acesso Rápido por Perfil (1 Clique)
       </div>
 
+      <?php
+        $uniqueProfiles = [];
+        $profileUsers = [];
+        foreach ($usuarios as $u) {
+            if (!isset($uniqueProfiles[$u->perfil])) {
+                $uniqueProfiles[$u->perfil] = true;
+                $profileUsers[] = $u;
+            }
+        }
+      ?>
+
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <?php foreach ($usuarios as $u): ?>
+        <?php foreach ($profileUsers as $u): ?>
           <form action="/login" method="POST" style="margin: 0;">
             <?= \App\Core\View::render('partials/csrf', [], null) ?>
             <input type="hidden" name="email" value="<?= htmlspecialchars($u->email, ENT_QUOTES, 'UTF-8') ?>">
-            <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: flex-start; font-size: 11px; padding: 6px 8px;">
+            <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; justify-content: flex-start; font-size: 11px; padding: 6px 8px;" title="Entrar como <?= htmlspecialchars($u->nome, ENT_QUOTES, 'UTF-8') ?>">
               <span><?= htmlspecialchars($u->perfil, ENT_QUOTES, 'UTF-8') ?></span>
             </button>
           </form>
@@ -59,7 +70,14 @@
     </div>
   </div>
 
+  <?php
+    $isDbConnected = \App\Core\Database::isConnected();
+  ?>
   <div style="background-color: var(--bg-subtle); padding: 12px; text-align: center; font-size: 11px; color: var(--text-muted); border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
-    Plataforma de Demonstração em PHP • Banco de dados não conectado nesta etapa
+    <?php if ($isDbConnected): ?>
+      <span style="color: #059669; font-weight: 600;">● PostgreSQL Conectado</span> (Base: gestao_social • Persistência Ativa)
+    <?php else: ?>
+      <span style="color: #d97706; font-weight: 600;">● Modo Demonstração</span> (Em Memória)
+    <?php endif; ?>
   </div>
 </div>

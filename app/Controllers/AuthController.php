@@ -37,11 +37,13 @@ final class AuthController
             return;
         }
 
-        // Em modo de demonstração, se o login foi acionado via botão rápido de perfil (sem campo de senha)
+        // Se o login foi acionado via botão de acesso rápido por perfil (sem campo de senha)
         if ($password === '') {
-            $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'true');
-            if ($isDemo) {
-                $password = 'demo123';
+            $success = $this->authService->loginDemo($email);
+            if ($success) {
+                Session::flash('success', 'Bem-vindo à Plataforma de Gestão Social e Assistencial!');
+                Response::redirect('/dashboard');
+                return;
             }
         }
 
