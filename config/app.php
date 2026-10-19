@@ -45,6 +45,7 @@ $forceDemo = (getenv('APP_DEMO_MODE') === 'true');
 $useDatabase = !$forceDemo && (getenv('DB_CONNECTION') === 'pgsql' || Database::isConnected());
 
 if ($useDatabase) {
+    Container::singleton(\PDO::class, fn() => Database::getConnection());
     Container::singleton(FamiliaRepositoryInterface::class, FamiliaRepositoryDb::class);
     Container::singleton(PessoaRepositoryInterface::class, PessoaRepositoryDb::class);
     Container::singleton(AvaliacaoRepositoryInterface::class, AvaliacaoRepositoryDb::class);

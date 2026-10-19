@@ -57,15 +57,21 @@ final class Container
 
         foreach ($parameters as $param) {
             $type = $param->getType();
-            if ($type === null || $type->isBuiltin()) {
-                if ($param->isDefaultValueAvailable()) {
+            if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
+                $dependencyClassName = $type->getName();
+                if ($dependencyClassName === \PDO::class) {
+                    $dependencies[] = Database::getConnection();
+                } elseif (isset(self::$bindings[$dependencyClassName])) {
+                    $dependencies[] = self::resolve($dependencyClassName);
+                } elseif ($param->isDefaultValueAvailable()) {
                     $dependencies[] = $param->getDefaultValue();
                 } else {
-                    throw new \RuntimeException("Não foi possível resolver parâmetro '{$param->getName()}' em {$abstract}.");
+                    $dependencies[] = self::resolve($dependencyClassName);
                 }
+            } elseif ($param->isDefaultValueAvailable()) {
+                $dependencies[] = $param->getDefaultValue();
             } else {
-                $dependencyClassName = $type->getName();
-                $dependencies[] = self::resolve($dependencyClassName);
+                throw new \RuntimeException("Não foi possível resolver parâmetro '{$param->getName()}' em {$abstract}.");
             }
         }
 

@@ -52,14 +52,27 @@ O sistema detectará que o banco não está configurado e utilizará automaticam
 
 Para conectar ao banco de dados relacional e persistir todos os dados:
 
+> [!IMPORTANT]
+> **Atenção ao diretório do terminal:** Certifique-se de que o seu terminal esteja **dentro da pasta do projeto** (`gestao_social`). Se você estiver na pasta pai (ex: `Downloads`), entre na pasta primeiro:
+> ```powershell
+> cd "c:\Users\seu_usuario\Downloads\Gestão Social\gestao_social"
+> ```
+> *(No Windows PowerShell ou Prompt de Comando, execute o comando PHP diretamente, **não digite `bash`**).*
+
 ### Opção A: Executar o Script Automatizado (Recomendado)
 Criamos um script que faz tudo por você em 1 único comando:
 
-```bash
-php scripts/setup_database.php [sua_senha_do_postgres]
+**No Windows (PowerShell ou Prompt de Comando):**
+```powershell
+php scripts/setup_database.php sua_senha_do_postgres
 ```
 
-O script realizará:
+**No Linux ou macOS (Bash/Zsh):**
+```bash
+php scripts/setup_database.php sua_senha_do_postgres
+```
+
+O script realizará automaticamente:
 1. Conexão ao servidor PostgreSQL local;
 2. Criação automática do banco de dados `gestao_social` (se ainda não existir);
 3. Aplicação do DDL de tabelas e índices (`sql/01_schema_ddl.sql`);

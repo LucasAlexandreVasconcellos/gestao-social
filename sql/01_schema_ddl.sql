@@ -706,6 +706,7 @@ CREATE TABLE IF NOT EXISTS gestao_social.categorias_produtos (
 
 CREATE TABLE IF NOT EXISTS gestao_social.produtos (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    codigo VARCHAR(50),
     categoria_id BIGINT NOT NULL,
     nome VARCHAR(150) NOT NULL UNIQUE,
     unidade_medida VARCHAR(20) NOT NULL DEFAULT 'UN',
@@ -733,6 +734,7 @@ CREATE TABLE IF NOT EXISTS gestao_social.lotes_produto (
 
 CREATE TABLE IF NOT EXISTS gestao_social.doadores (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tipo VARCHAR(10) DEFAULT 'PF',
     tipo_doador VARCHAR(2) NOT NULL DEFAULT 'PF',
     nome VARCHAR(150) NOT NULL,
     documento VARCHAR(14) UNIQUE, -- CPF (11 dígitos) ou CNPJ (14 dígitos numéricos)

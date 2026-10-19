@@ -21,7 +21,8 @@ require_once ROOT_PATH . '/app/Core/polyfills.php';
 \App\Core\Autoloader::register();
 \App\Core\Autoloader::addNamespace('App', ROOT_PATH . '/app');
 
-\App\Core\Session::start();
+// Garante isolamento estrito para a suíte de testes unitários de regras de negócio
+putenv('APP_DEMO_MODE=true');
 
 // Carrega injeção de dependências
 require_once ROOT_PATH . '/config/app.php';
