@@ -114,4 +114,5 @@ $router->get('/relatorios/export', [RelatorioController::class, 'export'], [Auth
 // Módulo 11 — Usuários, Permissões e Auditoria
 $router->get('/usuarios', [UsuarioController::class, 'index'], [AuthMiddleware::class]);
 $router->post('/usuarios/alternar-perfil', [UsuarioController::class, 'switchRole'], $authGroup);
+$router->post('/usuarios/switch-role', [UsuarioController::class, 'switchRole'], $authGroup);
 $router->get('/auditoria', [UsuarioController::class, 'auditoria'], [AuthMiddleware::class]);

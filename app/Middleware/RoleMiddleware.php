@@ -27,6 +27,13 @@ final class RoleMiddleware
             $userData['ativo'] ?? true
         );
 
+        if (!$user->ativo) {
+            Session::destroy();
+            Session::flash('error', 'Acesso negado: Sua conta de usuário foi inativada.');
+            Response::redirect('/login');
+            return false;
+        }
+
         // Se a requisição for de alteração (POST) e o usuário for do perfil 'Consulta', bloqueia a mutação
         if ($request->isPost() && $user->perfil === Usuario::PERFIL_CONSULTA) {
             Session::flash('error', 'Acesso negado: Usuários com perfil [Consulta] possuem acesso estritamente somente leitura.');

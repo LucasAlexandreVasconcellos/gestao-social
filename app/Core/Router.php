@@ -101,9 +101,15 @@ final class Router
                 echo $response;
             }
         } catch (\Throwable $e) {
-            // Em produção/demonstração segura, renderiza página 500 amigável sem expor senhas
+            error_log('[ERROR 500] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() . "\n" . $e->getTraceAsString());
             http_response_code(500);
-            echo View::render('errors/500', ['error' => $e->getMessage()], 'layouts/main');
+
+            $isProduction = (getenv('APP_ENV') === 'production');
+            $errorMessage = $isProduction 
+                ? 'Ocorreu um erro interno durante o processamento da sua solicitação. O incidente foi registrado para análise da equipe técnica.' 
+                : $e->getMessage() . ' (em ' . basename($e->getFile()) . ':' . $e->getLine() . ')';
+
+            echo View::render('errors/500', ['error' => $errorMessage], 'layouts/main');
         }
     }
 }

@@ -111,6 +111,23 @@ final class FormValidator
         return $this;
     }
 
+    public function email(string $field, string $label, bool $required = false): self
+    {
+        $val = trim((string)($this->data[$field] ?? ''));
+        if ($val === '') {
+            if ($required) {
+                $this->errors[$field] = "O campo {$label} é obrigatório.";
+            }
+            return $this;
+        }
+
+        if (!filter_var($val, FILTER_VALIDATE_EMAIL)) {
+            $this->errors[$field] = "O campo {$label} deve conter um endereço de e-mail válido.";
+        }
+
+        return $this;
+    }
+
     public function inList(string $field, array $allowed, string $label): self
     {
         $val = trim((string)($this->data[$field] ?? ''));

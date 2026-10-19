@@ -1,0 +1,16 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Bloqueia acesso a arquivos dotfile (.env, .git, .gitignore, etc.)
+    RewriteRule (^|/)\.(?!well-known) - [F,L]
+
+    # Bloqueia acesso direto a pastas internas da aplicação
+    RewriteRule ^(app|config|storage|sql|routes|tests|contexto|docs)/ - [F,L]
+
+    # Redireciona tráfego para a pasta public/ caso o DocumentRoot esteja na raiz
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Desativa listagem e navegação de diretórios
+Options -Indexes

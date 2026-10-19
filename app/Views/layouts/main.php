@@ -3,6 +3,7 @@
 /** @var array|null $user */
 $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
 $isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' : '';
+$isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'true');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -105,7 +106,8 @@ $isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' :
         </div>
 
         <div class="header-actions">
-          <!-- Alternador Rápido de Perfis Demonstrativos -->
+          <?php if ($isDemo): ?>
+          <!-- Alternador Rápido de Perfis Demonstrativos (Habilitado apenas no modo Demo) -->
           <form action="/usuarios/alternar-perfil" method="POST" style="margin: 0;">
             <?= \App\Core\View::render('partials/csrf', [], null) ?>
             <div class="role-switcher" title="Alterne entre os perfis demonstrativos para inspecionar permissões RBAC">
@@ -120,6 +122,7 @@ $isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' :
               </select>
             </div>
           </form>
+          <?php endif; ?>
 
           <div style="font-size: 13px; text-align: right;">
             <div style="font-weight: 600; color: var(--text-main);"><?= htmlspecialchars($user['nome'] ?? 'Usuário', ENT_QUOTES, 'UTF-8') ?></div>
@@ -130,7 +133,8 @@ $isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' :
         </div>
       </header>
 
-      <!-- Banner Demonstrativo Obrigatório -->
+      <?php if ($isDemo): ?>
+      <!-- Banner Demonstrativo -->
       <div class="demo-banner no-print">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span class="demo-badge">Modo Demonstração</span>
@@ -140,6 +144,7 @@ $isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' :
           <a href="/auditoria" style="color: inherit; text-decoration: underline; font-weight: 600;">Ver Auditoria</a>
         </div>
       </div>
+      <?php endif; ?>
 
       <!-- Área de Conteúdo -->
       <main class="app-content">

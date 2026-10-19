@@ -73,7 +73,7 @@ use App\Models\Familia;
       <?php if (!empty($avaliacao->necessidadesPrioritarias)): ?>
         <div style="margin-top: 12px; font-size: 13px;">
           <strong>Carências Prioritárias:</strong>
-          <?= implode(', ', array_map('ucfirst', $avaliacao->necessidadesPrioritarias)) ?>
+          <?= implode(', ', array_map(fn($item) => htmlspecialchars(ucfirst((string)$item), ENT_QUOTES, 'UTF-8'), $avaliacao->necessidadesPrioritarias)) ?>
         </div>
       <?php endif; ?>
     </div>

@@ -5,6 +5,19 @@ declare(strict_types=1);
 // Ponto de entrada único da aplicação (Front Controller)
 define('ROOT_PATH', dirname(__DIR__));
 
+// Cabeçalhos de Segurança HTTP (OWASP Best Practices)
+if (!headers_sent()) {
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('X-XSS-Protection: 1; mode=block');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+    if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || 
+        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+}
+
 require_once ROOT_PATH . '/app/Core/Autoloader.php';
 require_once ROOT_PATH . '/app/Core/polyfills.php';
 

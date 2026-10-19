@@ -30,16 +30,21 @@ final class Session
         }
 
         // Configuração de cookies seguros de sessão
+        $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
+                   (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+
         $cookieParams = [
             'lifetime' => 0,
             'path' => '/',
             'domain' => '',
-            'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+            'secure' => $isHttps,
             'httponly' => true,
             'samesite' => 'Lax'
         ];
 
-        session_set_cookie_params($cookieParams);
+        if (!headers_sent()) {
+            session_set_cookie_params($cookieParams);
+        }
         @session_start();
         self::$started = true;
 
@@ -110,11 +115,21 @@ final class Session
         return hash_equals($_SESSION['_csrf_token'], $token);
     }
 
+    public static function regenerate(bool $deleteOldSession = true): void
+    {
+        self::start();
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            @session_regenerate_id($deleteOldSession);
+            // Renova o token CSRF junto com a sessão para máxima segurança
+            $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+        }
+    }
+
     public static function destroy(): void
     {
         self::start();
         $_SESSION = [];
-        if (ini_get('session.use_cookies')) {
+        if (ini_get('session.use_cookies') && !headers_sent()) {
             $params = session_get_cookie_params();
             setcookie(
                 session_name(),
@@ -126,7 +141,7 @@ final class Session
                 $params['httponly']
             );
         }
-        session_destroy();
+        @session_destroy();
         self::$started = false;
     }
 }

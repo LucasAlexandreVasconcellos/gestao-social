@@ -119,7 +119,8 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
             $row['email'],
             $perfil,
             (bool)$row['ativo'],
-            $row['ultimo_acesso'] ? substr((string)$row['ultimo_acesso'], 0, 19) : null
+            $row['ultimo_acesso'] ? substr((string)$row['ultimo_acesso'], 0, 19) : null,
+            $row['senha_hash'] ?? null
         );
     }
 

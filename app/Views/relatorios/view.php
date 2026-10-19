@@ -224,7 +224,7 @@ $queryNominal = array_merge($filters ?? [], ['tipo' => $tipo, 'anonimizado' => 0
                   <td>
                     <?php if ($anonimizado): ?>
                       <span style="font-family: monospace; font-weight: 600; color: var(--text-main);">
-                        <?= FormatHelper::anonymizeName($item['responsavel']) ?>
+                        <?= $e(FormatHelper::anonymizeName($item['responsavel'])) ?>
                       </span>
                     <?php else: ?>
                       <strong><?= $e($item['responsavel']) ?></strong>
@@ -372,7 +372,7 @@ $queryNominal = array_merge($filters ?? [], ['tipo' => $tipo, 'anonimizado' => 0
                   <td>
                     <?php if ($anonimizado): ?>
                       <span style="font-family: monospace; font-weight: 600; color: var(--text-main);">
-                        <?= FormatHelper::anonymizeName($b['familiaNome']) ?>
+                        <?= $e(FormatHelper::anonymizeName($b['familiaNome'])) ?>
                       </span><br>
                       <small class="text-muted"><?= $e($b['familiaCodigo']) ?></small>
                     <?php else: ?>

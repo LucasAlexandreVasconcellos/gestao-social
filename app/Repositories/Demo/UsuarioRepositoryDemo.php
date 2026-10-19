@@ -26,13 +26,14 @@ final class UsuarioRepositoryDemo implements UsuarioRepositoryInterface
     private function ensureSeedData(): void
     {
         if (!Session::has(self::SESSION_KEY)) {
+            $demoHash = password_hash('demo123', PASSWORD_BCRYPT);
             $initial = [
-                1 => new Usuario(1, 'Administrador do Sistema', 'admin@gestaosocial.org', Usuario::PERFIL_ADMIN, true, '2026-03-14 09:30:00'),
-                2 => new Usuario(2, 'Fernanda Coordenadora', 'coordenacao@gestaosocial.org', Usuario::PERFIL_COORDENACAO, true, '2026-03-14 08:45:00'),
-                3 => new Usuario(3, 'Ana Paula Silva (CRESS 12345)', 'social@gestaosocial.org', Usuario::PERFIL_ASSISTENTE_SOCIAL, true, '2026-03-14 10:15:00'),
-                4 => new Usuario(4, 'Robson Almoxarife', 'estoque@gestaosocial.org', Usuario::PERFIL_ESTOQUE, true, '2026-03-13 16:20:00'),
-                5 => new Usuario(5, 'Juliana Recepção', 'atendimento@gestaosocial.org', Usuario::PERFIL_ATENDIMENTO, true, '2026-03-14 11:00:00'),
-                6 => new Usuario(6, 'Carlos Auditor Externo', 'consulta@gestaosocial.org', Usuario::PERFIL_CONSULTA, true, '2026-03-10 14:00:00'),
+                1 => new Usuario(1, 'Administrador do Sistema', 'admin@gestaosocial.org', Usuario::PERFIL_ADMIN, true, '2026-03-14 09:30:00', $demoHash),
+                2 => new Usuario(2, 'Fernanda Coordenadora', 'coordenacao@gestaosocial.org', Usuario::PERFIL_COORDENACAO, true, '2026-03-14 08:45:00', $demoHash),
+                3 => new Usuario(3, 'Ana Paula Silva (CRESS 12345)', 'social@gestaosocial.org', Usuario::PERFIL_ASSISTENTE_SOCIAL, true, '2026-03-14 10:15:00', $demoHash),
+                4 => new Usuario(4, 'Robson Almoxarife', 'estoque@gestaosocial.org', Usuario::PERFIL_ESTOQUE, true, '2026-03-13 16:20:00', $demoHash),
+                5 => new Usuario(5, 'Juliana Recepção', 'atendimento@gestaosocial.org', Usuario::PERFIL_ATENDIMENTO, true, '2026-03-14 11:00:00', $demoHash),
+                6 => new Usuario(6, 'Carlos Auditor Externo', 'consulta@gestaosocial.org', Usuario::PERFIL_CONSULTA, true, '2026-03-10 14:00:00', $demoHash),
             ];
 
             Session::set(self::SESSION_KEY, $initial);

@@ -18,6 +18,13 @@ final class AuthMiddleware
             return false;
         }
 
+        if (\App\Core\Database::isConnected()) {
+            $user = Session::get('user');
+            if (!empty($user['id'])) {
+                \App\Core\Database::setAuditContext((int)$user['id'], $user['email'] ?? $user['nome'] ?? null);
+            }
+        }
+
         return true;
     }
 }

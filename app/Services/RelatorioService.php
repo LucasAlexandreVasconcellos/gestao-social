@@ -197,8 +197,11 @@ final class RelatorioService
 
     public function exportarCsv(array $cabecalhos, array $linhas, string $filename = 'relatorio.csv'): void
     {
+        // Sanitiza o nome do arquivo contra CRLF e Header Injection
+        $safeFilename = preg_replace('/[^a-zA-Z0-9_\-\.]/', '_', $filename) ?: 'relatorio.csv';
+
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
         header('Pragma: no-cache');
         header('Expires: 0');
 
@@ -206,10 +209,23 @@ final class RelatorioService
         // BOM UTF-8 para compatibilidade perfeita com Excel no Windows
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
-        fputcsv($output, $cabecalhos, ';');
+        $sanitizeCell = static function (mixed $cell): mixed {
+            if (!is_string($cell)) {
+                return $cell;
+            }
+            // Prevenção contra CSV Formula Injection (CWE-1236)
+            if (preg_match('/^[=+\-@\t\r]/', $cell)) {
+                return "'" . $cell;
+            }
+            return $cell;
+        };
+
+        $safeCabecalhos = array_map($sanitizeCell, $cabecalhos);
+        fputcsv($output, $safeCabecalhos, ';');
 
         foreach ($linhas as $linha) {
-            fputcsv($output, $linha, ';');
+            $safeLinha = array_map($sanitizeCell, (array)$linha);
+            fputcsv($output, $safeLinha, ';');
         }
 
         fclose($output);

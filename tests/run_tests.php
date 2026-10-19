@@ -531,6 +531,51 @@ $t->run('Auditoria & Rastreabilidade LGPD: Registro de visualização e exporta�
     $t->assertEquals('Relatorio', $ultimo->entidade);
 });
 
+$t->run('FormValidator: Validação de endereço de e-mail', function() use ($t) {
+    $v1 = new FormValidator(['email' => '']);
+    $v1->email('email', 'E-mail', false);
+    $t->assert($v1->isValid(), 'E-mail vazio opcional deve ser válido');
+
+    $v2 = new FormValidator(['email' => '']);
+    $v2->email('email', 'E-mail', true);
+    $t->assert(!$v2->isValid(), 'E-mail obrigatório vazio deve falhar');
+
+    $v3 = new FormValidator(['email' => 'contato@gestaosocial.org.br']);
+    $v3->email('email', 'E-mail', true);
+    $t->assert($v3->isValid(), 'E-mail em formato RFC válido deve passar');
+
+    $v4 = new FormValidator(['email' => 'invalido@@email..com']);
+    $v4->email('email', 'E-mail', true);
+    $t->assert(!$v4->isValid(), 'E-mail com formato inválido deve ser rejeitado');
+});
+
+$t->run('FormatHelper: Tratamento de data e datetime com retrocompatibilidade', function() use ($t) {
+    $dt = '2026-10-19 14:30:00';
+    $t->assertEquals('19/10/2026', \App\Helpers\FormatHelper::date($dt), 'date padrão deve formatar d/m/Y');
+    $t->assertEquals('19/10/2026 14:30', \App\Helpers\FormatHelper::datetime($dt), 'datetime deve formatar d/m/Y H:i');
+    $t->assertEquals('19/10/2026 14:30', \App\Helpers\FormatHelper::date($dt, true), 'date com true deve delegar para datetime');
+    $t->assertEquals('-', \App\Helpers\FormatHelper::date(null), 'date com null deve retornar traço');
+});
+
+$t->run('AuthService: Autenticação segura com verificação de senha bcrypt', function() use ($t) {
+    /** @var \App\Services\AuthService $auth */
+    $auth = \App\Core\Container::resolve(\App\Services\AuthService::class);
+
+    // Tentativa com senha errada
+    $falha = $auth->login('admin@gestaosocial.org', 'senha_errada');
+    $t->assert(!$falha, 'Login com senha incorreta deve retornar false');
+
+    // Tentativa com credenciais válidas do usuário demo
+    $sucesso = $auth->login('admin@gestaosocial.org', 'demo123');
+    $t->assert($sucesso, 'Login com senha correta deve ter sucesso');
+    $t->assert($auth->check(), 'Auth::check deve retornar true após login');
+    $t->assertEquals('Administrador', $auth->user()->perfil);
+
+    // Logout
+    $auth->logout();
+    $t->assert(!$auth->check(), 'Auth::check deve retornar false após logout');
+});
+
 // Finaliza e imprime relatório
 $exitCode = $t->printSummary();
 exit($exitCode);

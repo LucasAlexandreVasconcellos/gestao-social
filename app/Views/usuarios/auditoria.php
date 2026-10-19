@@ -87,7 +87,7 @@
                             <tr>
                                 <td>
                                     <span style="font-family: monospace; font-size: 0.85rem;">
-                                        <?= \App\Helpers\FormatHelper::date($log->dataHora, true) ?>
+                                        <?= \App\Helpers\FormatHelper::datetime($log->dataHora) ?>
                                     </span>
                                 </td>
                                 <td>

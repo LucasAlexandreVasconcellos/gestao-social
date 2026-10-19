@@ -29,6 +29,7 @@ final class AuthController
     public function authenticate(Request $request): void
     {
         $email = trim((string)$request->post('email', ''));
+        $password = (string)$request->post('password', '');
 
         if (empty($email)) {
             Session::flash('error', 'Por favor informe o e-mail de acesso.');
@@ -36,10 +37,18 @@ final class AuthController
             return;
         }
 
-        $success = $this->authService->loginDemo($email);
+        // Em modo de demonstração, se o login foi acionado via botão rápido de perfil (sem campo de senha)
+        if ($password === '') {
+            $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'true');
+            if ($isDemo) {
+                $password = 'demo123';
+            }
+        }
+
+        $success = $this->authService->login($email, $password);
 
         if (!$success) {
-            Session::flash('error', 'Credenciais inválidas ou usuário inativo no sistema demonstrativo.');
+            Session::flash('error', 'Credenciais inválidas ou usuário inativo no sistema.');
             Response::redirect('/login');
             return;
         }

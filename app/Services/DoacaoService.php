@@ -98,9 +98,9 @@ final class DoacaoService
 
                 $this->doacaoRepo->addItem($item);
 
-                // Na simulação em memória, se o produto já existir no estoque, realiza entrada automática
-                // NOTA: Na futura integração com banco de dados, a doação de produtos gerará registro de entrada no estoque
-                if ($prodId) {
+                // Na simulação em memória (modo Demo), realiza a entrada manual.
+                // No PostgreSQL, a trigger trg_ciclo_status_doacao_estoque realiza a entrada automaticamente quando o status for 'Confirmada'.
+                if ($this->isDemoEstoque() && $prodId) {
                     $produto = $this->estoqueRepo->findProdutoById($prodId);
                     if ($produto) {
                         $mov = new MovimentacaoEstoque(
@@ -125,5 +125,10 @@ final class DoacaoService
         $this->auditLog->log('Criar', 'Doacao', $saved->id, "Doação recebida de {$saved->nomeDoador} ({$saved->tipoDoacao})");
 
         return ['success' => true, 'doacao' => $saved];
+    }
+
+    private function isDemoEstoque(): bool
+    {
+        return defined(get_class($this->estoqueRepo) . '::IS_DEMO');
     }
 }

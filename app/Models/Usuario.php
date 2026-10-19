@@ -19,7 +19,8 @@ final class Usuario
         public string $email,
         public string $perfil,
         public bool $ativo = true,
-        public ?string $ultimoAcesso = null
+        public ?string $ultimoAcesso = null,
+        public ?string $senhaHash = null
     ) {}
 
     public function can(string $permission): bool
@@ -59,6 +60,8 @@ final class Usuario
 
     public function toArray(): array
     {
-        return get_object_vars($this);
+        $data = get_object_vars($this);
+        unset($data['senhaHash']);
+        return $data;
     }
 }

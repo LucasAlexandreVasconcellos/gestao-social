@@ -54,10 +54,10 @@
                             <td>
                                 <span class="badge badge-success">Ativo</span>
                             </td>
-                            <td><?= $u->ultimoAcesso ? \App\Helpers\FormatHelper::date($u->ultimoAcesso, true) : 'Demonstração' ?></td>
+                            <td><?= $u->ultimoAcesso ? \App\Helpers\FormatHelper::datetime($u->ultimoAcesso) : 'Demonstração' ?></td>
                             <td style="text-align: right;">
                                 <?php if (!$currentUser || $currentUser->id !== $u->id): ?>
-                                    <form method="POST" action="/usuarios/switch-role" style="display: inline;">
+                                    <form method="POST" action="/usuarios/alternar-perfil" style="display: inline;">
                                         <?= \App\Core\View::renderPartial('partials/csrf') ?>
                                         <input type="hidden" name="userId" value="<?= $u->id ?>">
                                         <button type="submit" class="btn btn-secondary btn-sm" title="Alternar sessão para este usuário e testar suas permissões">

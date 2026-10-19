@@ -6,13 +6,17 @@ namespace App\Helpers;
 
 final class FormatHelper
 {
-    public static function date(?string $date, string $format = 'd/m/Y'): string
+    public static function date(?string $date, string|bool $format = 'd/m/Y'): string
     {
         if (empty($date)) {
             return '-';
         }
+        if ($format === true) {
+            return self::datetime($date);
+        }
+        $formatStr = is_string($format) ? $format : 'd/m/Y';
         $timestamp = strtotime($date);
-        return $timestamp ? date($format, $timestamp) : '-';
+        return $timestamp ? date($formatStr, $timestamp) : '-';
     }
 
     public static function datetime(?string $datetime, string $format = 'd/m/Y H:i'): string

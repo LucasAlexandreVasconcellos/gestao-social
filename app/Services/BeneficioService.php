@@ -112,7 +112,7 @@ final class BeneficioService
                 // Se a entrega foi efetivada, simula em memória a baixa do estoque
                 // NOTA DE ARQUITETURA: Na futura integração com banco de dados,
                 // a gravação da entrega e a baixa do estoque DEVEM ocorrer dentro de uma transação atômica (BEGIN TRANSACTION ... COMMIT).
-                if ($situacao === 'Efetivada' && $produto) {
+                if ($this->isDemoEstoque() && $situacao === 'Efetivada' && $produto) {
                     $mov = new MovimentacaoEstoque(
                         0,
                         $savedEntrega->dataEntrega,
@@ -160,27 +160,35 @@ final class BeneficioService
         $entrega->situacao = 'Efetivada';
         $this->beneficioRepo->update($entrega);
 
-        // Realiza baixa de estoque simulada em memória
-        foreach ($entrega->itens as $item) {
-            $mov = new MovimentacaoEstoque(
-                0,
-                date('Y-m-d'),
-                $item->produtoId,
-                $item->nomeProduto,
-                'Saída',
-                $item->quantidade,
-                $item->lote,
-                null,
-                $familia ? "Família {$familia->codigo}" : "Família #{$entrega->familiaId}",
-                "Efetivação de entrega de benefício #{$entrega->id}",
-                $entrega->responsavelDistribuicao
-            );
-            $this->estoqueRepo->saveMovimentacao($mov);
+        // Realiza baixa de estoque manual apenas no modo Demo.
+        // No PostgreSQL, a trigger trg_ciclo_status_entrega_estoque faz a baixa automaticamente.
+        if ($this->isDemoEstoque()) {
+            foreach ($entrega->itens as $item) {
+                $mov = new MovimentacaoEstoque(
+                    0,
+                    date('Y-m-d'),
+                    $item->produtoId,
+                    $item->nomeProduto,
+                    'Saída',
+                    $item->quantidade,
+                    $item->lote,
+                    null,
+                    $familia ? "Família {$familia->codigo}" : "Família #{$entrega->familiaId}",
+                    "Efetivação de entrega de benefício #{$entrega->id}",
+                    $entrega->responsavelDistribuicao
+                );
+                $this->estoqueRepo->saveMovimentacao($mov);
+            }
         }
 
-        $this->auditLog->log('Efetivar Entrega', 'BeneficioEntrega', $entrega->id, "Entrega #{$entrega->id} efetivada e estoque baixado em memória.");
+        $this->auditLog->log('Efetivar Entrega', 'BeneficioEntrega', $entrega->id, "Entrega #{$entrega->id} efetivada.");
 
         return ['success' => true, 'entrega' => $entrega];
+    }
+
+    private function isDemoEstoque(): bool
+    {
+        return defined(get_class($this->estoqueRepo) . '::IS_DEMO');
     }
 
     public function cancelarEntrega(int $entregaId, string $motivo): array
