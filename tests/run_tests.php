@@ -576,6 +576,45 @@ $t->run('AuthService: Autenticação segura com verificação de senha bcrypt', 
     $t->assert(!$auth->check(), 'Auth::check deve retornar false após logout');
 });
 
+$t->run('FormValidator & FamiliaService: Normalização monetária brasileira (ex: 1.000,00 e 1000)', function() use ($t) {
+    // Normalização unitária
+    $t->assertEquals(1000.0, \App\Validators\FormValidator::normalizeMoneyInput('1000'), '1000 puro deve normalizar para 1000.0');
+    $t->assertEquals(1000.0, \App\Validators\FormValidator::normalizeMoneyInput('1000,00'), '1000,00 deve normalizar para 1000.0');
+    $t->assertEquals(1000.0, \App\Validators\FormValidator::normalizeMoneyInput('1.000,00'), '1.000,00 com ponto de milhar deve normalizar para 1000.0');
+    $t->assertEquals(1250.75, \App\Validators\FormValidator::normalizeMoneyInput('1.250,75'), '1.250,75 deve normalizar para 1250.75');
+    $t->assertEquals(2500.0, \App\Validators\FormValidator::normalizeMoneyInput('R$ 2.500,00'), 'Com símbolo de moeda deve normalizar para 2500.0');
+    $t->assertEquals(0.0, \App\Validators\FormValidator::normalizeMoneyInput('0,00'), '0,00 deve normalizar para 0.0');
+
+    // Validador aceitando formato com separadores brasileiros
+    $v = new \App\Validators\FormValidator([
+        'renda' => '1.500,00',
+        'despesas' => '650,50'
+    ]);
+    $v->numeric('renda', 'Renda')->numeric('despesas', 'Despesas');
+    $t->assert($v->isValid(), 'Validador numeric deve aceitar formato monetário com pontos e vírgulas');
+
+    // Criação de família com dados monetários formatados
+    /** @var \App\Services\FamiliaService $famService */
+    $famService = \App\Core\Container::resolve(\App\Services\FamiliaService::class);
+    $res = $famService->criar([
+        'pessoaReferenciaNome' => 'Teste Moeda Silva',
+        'logradouro' => 'Rua das Flores',
+        'numero' => '123',
+        'bairro' => 'Centro',
+        'municipio' => 'Brasília',
+        'uf' => 'DF',
+        'cep' => '70000-000',
+        'rendaFamiliar' => '1.850,50',
+        'despesasMensais' => '920,00',
+        'situacaoMoradia' => 'Própria',
+        'situacaoCadastral' => 'Ativa'
+    ]);
+
+    $t->assert($res['success'], 'Deve criar família com valores monetários formatados');
+    $t->assertEquals(1850.50, $res['familia']->rendaFamiliar, 'Renda deve ser gravada numericamente como float 1850.50');
+    $t->assertEquals(920.00, $res['familia']->despesasMensais, 'Despesas devem ser gravadas numericamente como float 920.00');
+});
+
 // Finaliza e imprime relatório
 $exitCode = $t->printSummary();
 exit($exitCode);

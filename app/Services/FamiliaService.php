@@ -77,8 +77,8 @@ final class FamiliaService
             return ['success' => false, 'errors' => $validator->getErrors()];
         }
 
-        $renda = (float)str_replace(',', '.', (string)($dados['rendaFamiliar'] ?? 0));
-        $despesas = (float)str_replace(',', '.', (string)($dados['despesasMensais'] ?? 0));
+        $renda = FormValidator::normalizeMoneyInput($dados['rendaFamiliar'] ?? 0);
+        $despesas = FormValidator::normalizeMoneyInput($dados['despesasMensais'] ?? 0);
 
         $familia = new Familia(
             0,
@@ -140,8 +140,8 @@ final class FamiliaService
             return ['success' => false, 'errors' => $validator->getErrors()];
         }
 
-        $renda = (float)str_replace(',', '.', (string)($dados['rendaFamiliar'] ?? 0));
-        $despesas = (float)str_replace(',', '.', (string)($dados['despesasMensais'] ?? 0));
+        $renda = FormValidator::normalizeMoneyInput($dados['rendaFamiliar'] ?? 0);
+        $despesas = FormValidator::normalizeMoneyInput($dados['despesasMensais'] ?? 0);
 
         $historico = $familia->historicoAlteracoes;
         $historico[] = [

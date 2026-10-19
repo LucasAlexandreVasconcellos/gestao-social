@@ -33,11 +33,38 @@ final class FormValidator
         return $this;
     }
 
+    public static function normalizeMoneyInput(mixed $val): float
+    {
+        if ($val === null || $val === '') {
+            return 0.0;
+        }
+        if (is_float($val) || is_int($val)) {
+            return (float)$val;
+        }
+        $str = trim((string)$val);
+        $str = preg_replace('/[^\d,\.\-]/', '', $str);
+        if ($str === '' || $str === null) {
+            return 0.0;
+        }
+        if (str_contains($str, ',')) {
+            $str = str_replace('.', '', $str);
+            $str = str_replace(',', '.', $str);
+        }
+        return is_numeric($str) ? (float)$str : 0.0;
+    }
+
     public function numeric(string $field, string $label): self
     {
         $val = $this->data[$field] ?? null;
-        if ($val !== null && $val !== '' && !is_numeric(str_replace(',', '.', (string)$val))) {
-            $this->errors[$field] = "O campo {$label} deve ser um valor numérico válido.";
+        if ($val !== null && $val !== '') {
+            $str = trim((string)$val);
+            if (str_contains($str, ',')) {
+                $str = str_replace('.', '', $str);
+                $str = str_replace(',', '.', $str);
+            }
+            if (!is_numeric($str)) {
+                $this->errors[$field] = "O campo {$label} deve ser um valor numérico válido.";
+            }
         }
         return $this;
     }
@@ -46,7 +73,7 @@ final class FormValidator
     {
         $val = $this->data[$field] ?? null;
         if ($val !== null && $val !== '') {
-            $num = (float)str_replace(',', '.', (string)$val);
+            $num = self::normalizeMoneyInput($val);
             if ($num < $minVal) {
                 $this->errors[$field] = "O campo {$label} deve ser maior ou igual a {$minVal}.";
             }

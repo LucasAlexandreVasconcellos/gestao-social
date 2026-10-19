@@ -48,7 +48,8 @@
       <div class="form-grid" style="margin-bottom: 24px;">
         <div class="form-group col-3">
           <label class="form-label" for="cep">CEP</label>
-          <input type="text" id="cep" name="cep" class="form-control mask-cep" placeholder="00000-000" value="<?= htmlspecialchars($old['cep'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+          <input type="text" id="cep" name="cep" class="form-control mask-cep" placeholder="00000-000" value="<?= htmlspecialchars($old['cep'] ?? '', ENT_QUOTES, 'UTF-8') ?>" autocomplete="postal-code">
+          <div id="cep-feedback" style="font-size: 11px; margin-top: 4px; display: none;"></div>
           <?php if (!empty($errors['cep'])): ?>
             <span class="form-error"><?= htmlspecialchars($errors['cep'], ENT_QUOTES, 'UTF-8') ?></span>
           <?php endif; ?>
@@ -97,13 +98,13 @@
       <div class="form-grid" style="margin-bottom: 24px;">
         <div class="form-group col-4">
           <label class="form-label" for="rendaFamiliar">Renda Familiar Mensal (R$)</label>
-          <input type="text" id="rendaFamiliar" name="rendaFamiliar" class="form-control" placeholder="0,00" value="<?= htmlspecialchars((string)($old['rendaFamiliar'] ?? '0.00'), ENT_QUOTES, 'UTF-8') ?>">
+          <input type="text" id="rendaFamiliar" name="rendaFamiliar" class="form-control mask-money" placeholder="0,00" value="<?= htmlspecialchars(is_numeric($old['rendaFamiliar'] ?? '') ? number_format((float)$old['rendaFamiliar'], 2, ',', '.') : ($old['rendaFamiliar'] ?? '0,00'), ENT_QUOTES, 'UTF-8') ?>">
           <span class="form-help">Soma de rendas fixas e eventuais de todos os membros.</span>
         </div>
 
         <div class="form-group col-4">
           <label class="form-label" for="despesasMensais">Despesas Mensais Estimadas (R$)</label>
-          <input type="text" id="despesasMensais" name="despesasMensais" class="form-control" placeholder="0,00" value="<?= htmlspecialchars((string)($old['despesasMensais'] ?? '0.00'), ENT_QUOTES, 'UTF-8') ?>">
+          <input type="text" id="despesasMensais" name="despesasMensais" class="form-control mask-money" placeholder="0,00" value="<?= htmlspecialchars(is_numeric($old['despesasMensais'] ?? '') ? number_format((float)$old['despesasMensais'], 2, ',', '.') : ($old['despesasMensais'] ?? '0,00'), ENT_QUOTES, 'UTF-8') ?>">
           <span class="form-help">Estimativa com alimentação, aluguel, gás e remédios.</span>
         </div>
 
