@@ -1,0 +1,32 @@
+name: CI/CD Pipeline - Gestão Social & Assistencial
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  tests:
+    name: Syntax & Unit Tests (PHP ${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php-version: ['8.2', '8.3']
+
+    steps:
+      - name: Checkout Código Fonte
+        uses: actions/checkout@v4
+
+      - name: Configurar Ambiente PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: pdo, pdo_pgsql, mbstring, openssl, ctype, json
+          coverage: none
+
+      - name: Validar Sintaxe PHP de Todos os Arquivos (Check Syntax)
+        run: php tests/check_syntax.php
+
+      - name: Executar Bateria Completa de Testes Automatizados
+        run: php tests/run_tests.php

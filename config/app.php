@@ -7,8 +7,10 @@ use App\Contracts\Repositories\AuditoriaRepositoryInterface;
 use App\Contracts\Repositories\AvaliacaoRepositoryInterface;
 use App\Contracts\Repositories\BeneficioRepositoryInterface;
 use App\Contracts\Repositories\DoacaoRepositoryInterface;
+use App\Contracts\Repositories\DocumentoRepositoryInterface;
 use App\Contracts\Repositories\EstoqueRepositoryInterface;
 use App\Contracts\Repositories\FamiliaRepositoryInterface;
+use App\Contracts\Repositories\NotificacaoRepositoryInterface;
 use App\Contracts\Repositories\PessoaRepositoryInterface;
 use App\Contracts\Repositories\ProjetoRepositoryInterface;
 use App\Contracts\Repositories\UsuarioRepositoryInterface;
@@ -19,8 +21,10 @@ use App\Repositories\Database\AuditoriaRepositoryDb;
 use App\Repositories\Database\AvaliacaoRepositoryDb;
 use App\Repositories\Database\BeneficioRepositoryDb;
 use App\Repositories\Database\DoacaoRepositoryDb;
+use App\Repositories\Database\DocumentoRepositoryDb;
 use App\Repositories\Database\EstoqueRepositoryDb;
 use App\Repositories\Database\FamiliaRepositoryDb;
+use App\Repositories\Database\NotificacaoRepositoryDb;
 use App\Repositories\Database\PessoaRepositoryDb;
 use App\Repositories\Database\ProjetoRepositoryDb;
 use App\Repositories\Database\UsuarioRepositoryDb;
@@ -29,8 +33,10 @@ use App\Repositories\Demo\AuditoriaRepositoryDemo;
 use App\Repositories\Demo\AvaliacaoRepositoryDemo;
 use App\Repositories\Demo\BeneficioRepositoryDemo;
 use App\Repositories\Demo\DoacaoRepositoryDemo;
+use App\Repositories\Demo\DocumentoRepositoryDemo;
 use App\Repositories\Demo\EstoqueRepositoryDemo;
 use App\Repositories\Demo\FamiliaRepositoryDemo;
+use App\Repositories\Demo\NotificacaoRepositoryDemo;
 use App\Repositories\Demo\PessoaRepositoryDemo;
 use App\Repositories\Demo\ProjetoRepositoryDemo;
 use App\Repositories\Demo\UsuarioRepositoryDemo;
@@ -56,6 +62,8 @@ if ($useDatabase) {
     Container::singleton(ProjetoRepositoryInterface::class, ProjetoRepositoryDb::class);
     Container::singleton(UsuarioRepositoryInterface::class, UsuarioRepositoryDb::class);
     Container::singleton(AuditoriaRepositoryInterface::class, AuditoriaRepositoryDb::class);
+    Container::singleton(DocumentoRepositoryInterface::class, DocumentoRepositoryDb::class);
+    Container::singleton(NotificacaoRepositoryInterface::class, NotificacaoRepositoryDb::class);
 } else {
     Container::singleton(FamiliaRepositoryInterface::class, FamiliaRepositoryDemo::class);
     Container::singleton(PessoaRepositoryInterface::class, PessoaRepositoryDemo::class);
@@ -67,6 +75,8 @@ if ($useDatabase) {
     Container::singleton(ProjetoRepositoryInterface::class, ProjetoRepositoryDemo::class);
     Container::singleton(UsuarioRepositoryInterface::class, UsuarioRepositoryDemo::class);
     Container::singleton(AuditoriaRepositoryInterface::class, AuditoriaRepositoryDemo::class);
+    Container::singleton(DocumentoRepositoryInterface::class, DocumentoRepositoryDemo::class);
+    Container::singleton(NotificacaoRepositoryInterface::class, NotificacaoRepositoryDemo::class);
 }
 
 return [

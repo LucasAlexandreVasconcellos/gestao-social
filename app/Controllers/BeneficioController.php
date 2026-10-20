@@ -11,6 +11,7 @@ use App\Core\View;
 use App\Services\BeneficioService;
 use App\Services\EstoqueService;
 use App\Services\FamiliaService;
+use App\Services\PdfService;
 use App\Services\ProjetoService;
 
 final class BeneficioController
@@ -19,7 +20,8 @@ final class BeneficioController
         private BeneficioService $beneficioService,
         private FamiliaService $familiaService,
         private EstoqueService $estoqueService,
-        private ProjetoService $projetoService
+        private ProjetoService $projetoService,
+        private PdfService $pdfService
     ) {}
 
     public function index(Request $request): string
@@ -136,5 +138,17 @@ final class BeneficioController
         }
 
         Response::redirect("/beneficios/{$id}");
+    }
+
+    public function termoPdf(Request $request): void
+    {
+        $id = (int)$request->param('id');
+        $pdf = $this->pdfService->gerarTermoBeneficio($id);
+        $filename = "termo_beneficio_{$id}.pdf";
+        if ($request->query('download') === '1') {
+            $pdf->download($filename);
+        } else {
+            $pdf->inline($filename);
+        }
     }
 }

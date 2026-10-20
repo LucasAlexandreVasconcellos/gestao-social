@@ -21,8 +21,10 @@ use App\Contracts\Repositories\AuditoriaRepositoryInterface;
 use App\Contracts\Repositories\AvaliacaoRepositoryInterface;
 use App\Contracts\Repositories\BeneficioRepositoryInterface;
 use App\Contracts\Repositories\DoacaoRepositoryInterface;
+use App\Contracts\Repositories\DocumentoRepositoryInterface;
 use App\Contracts\Repositories\EstoqueRepositoryInterface;
 use App\Contracts\Repositories\FamiliaRepositoryInterface;
+use App\Contracts\Repositories\NotificacaoRepositoryInterface;
 use App\Contracts\Repositories\PessoaRepositoryInterface;
 use App\Contracts\Repositories\ProjetoRepositoryInterface;
 use App\Contracts\Repositories\UsuarioRepositoryInterface;
@@ -32,8 +34,10 @@ use App\Repositories\Database\AuditoriaRepositoryDb;
 use App\Repositories\Database\AvaliacaoRepositoryDb;
 use App\Repositories\Database\BeneficioRepositoryDb;
 use App\Repositories\Database\DoacaoRepositoryDb;
+use App\Repositories\Database\DocumentoRepositoryDb;
 use App\Repositories\Database\EstoqueRepositoryDb;
 use App\Repositories\Database\FamiliaRepositoryDb;
+use App\Repositories\Database\NotificacaoRepositoryDb;
 use App\Repositories\Database\PessoaRepositoryDb;
 use App\Repositories\Database\ProjetoRepositoryDb;
 use App\Repositories\Database\UsuarioRepositoryDb;
@@ -53,6 +57,8 @@ $repositories = [
     ProjetoRepositoryInterface::class => ProjetoRepositoryDb::class,
     UsuarioRepositoryInterface::class => UsuarioRepositoryDb::class,
     AuditoriaRepositoryInterface::class => AuditoriaRepositoryDb::class,
+    DocumentoRepositoryInterface::class => DocumentoRepositoryDb::class,
+    NotificacaoRepositoryInterface::class => NotificacaoRepositoryDb::class,
 ];
 
 $errors = 0;

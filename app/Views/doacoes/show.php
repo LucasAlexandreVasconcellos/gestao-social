@@ -13,7 +13,10 @@ use App\Models\Doacao;
     </div>
   </div>
 
-  <button onclick="window.print()" class="btn btn-primary btn-sm">Imprimir Termo de Doação</button>
+  <div style="display: flex; gap: 8px;">
+    <a href="/doacoes/<?= $doacao->id ?>/recibo-pdf?download=1" class="btn btn-primary btn-sm" target="_blank" title="Baixar Recibo Oficial de Doação em PDF">📄 Emitir Recibo Oficial (PDF)</a>
+    <button onclick="window.print()" class="btn btn-outline btn-sm">Imprimir na Tela</button>
+  </div>
 </div>
 
 <div class="card" style="padding: 24px;">

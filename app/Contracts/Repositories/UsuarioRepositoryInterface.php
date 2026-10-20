@@ -20,4 +20,12 @@ interface UsuarioRepositoryInterface
     public function save(Usuario $usuario): Usuario;
 
     public function update(Usuario $usuario): bool;
+
+    public function setTwoFactorSecret(int $userId, string $secret, array $backupCodes): bool;
+
+    public function enableTwoFactor(int $userId): bool;
+
+    public function disableTwoFactor(int $userId): bool;
+
+    public function consumeBackupCode(int $userId, string $code): bool;
 }

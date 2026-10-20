@@ -86,6 +86,7 @@ final class FamiliaRepositoryDemo implements FamiliaRepositoryInterface
 
     public function findAll(array $filters = []): array
     {
+        $this->ensureSeedData();
         $families = Session::get(self::SESSION_KEY, []);
 
         if (!empty($filters['search'])) {
@@ -112,12 +113,14 @@ final class FamiliaRepositoryDemo implements FamiliaRepositoryInterface
 
     public function findById(int $id): ?Familia
     {
+        $this->ensureSeedData();
         $families = Session::get(self::SESSION_KEY, []);
         return $families[$id] ?? null;
     }
 
     public function findByCodigo(string $codigo): ?Familia
     {
+        $this->ensureSeedData();
         $families = Session::get(self::SESSION_KEY, []);
         foreach ($families as $familia) {
             if (strcasecmp($familia->codigo, $codigo) === 0) {
@@ -157,6 +160,7 @@ final class FamiliaRepositoryDemo implements FamiliaRepositoryInterface
 
     public function getIntegrantes(int $familiaId, bool $apenasAtivos = true): array
     {
+        $this->ensureSeedData();
         $vinculos = Session::get(self::SESSION_VINCULOS_KEY, []);
         $filtered = array_filter($vinculos, function (VinculoFamiliar $v) use ($familiaId, $apenasAtivos) {
             if ($familiaId > 0 && $v->familiaId !== $familiaId) {

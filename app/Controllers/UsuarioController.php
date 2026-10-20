@@ -15,7 +15,8 @@ final class UsuarioController
 {
     public function __construct(
         private AuthService $authService,
-        private AuditLogService $auditLogService
+        private AuditLogService $auditLogService,
+        private \App\Services\LgpdService $lgpdService
     ) {}
 
     public function index(Request $request): string
@@ -79,5 +80,55 @@ final class UsuarioController
 
         $referer = $_SERVER['HTTP_REFERER'] ?? '/dashboard';
         Response::redirect($referer);
+    }
+
+    public function lgpdIndex(Request $request): string
+    {
+        $currentUser = $this->authService->getCurrentUser();
+        if (!$currentUser || !in_array($currentUser->perfil, [\App\Models\Usuario::PERFIL_ADMIN, \App\Models\Usuario::PERFIL_COORDENACAO], true)) {
+            Session::flash('error', 'Acesso negado: O painel de governança LGPD é restrito à Administração e Coordenação.');
+            Response::redirect('/dashboard');
+        }
+
+        $inativos = $this->lgpdService->buscarInativos(5);
+        $solicitacoes = $this->lgpdService->listarSolicitacoes();
+
+        return View::render('usuarios/lgpd_anonimizacao', [
+            'currentUser' => $currentUser,
+            'inativos' => $inativos,
+            'solicitacoes' => $solicitacoes,
+            'success' => Session::flash('success'),
+            'error' => Session::flash('error')
+        ]);
+    }
+
+    public function anonimizar(Request $request): void
+    {
+        $currentUser = $this->authService->getCurrentUser();
+        if (!$currentUser || !in_array($currentUser->perfil, [\App\Models\Usuario::PERFIL_ADMIN, \App\Models\Usuario::PERFIL_COORDENACAO], true)) {
+            Session::flash('error', 'Acesso negado para operação de anonimização.');
+            Response::redirect('/dashboard');
+            return;
+        }
+
+        $pessoaId = (int)$request->post('pessoaId');
+        $motivo = trim((string)$request->post('motivo', 'Solicitação expressa do titular (Art. 18 LGPD)'));
+        $expurgarDocumentos = (bool)$request->post('expurgarDocumentos', true);
+
+        if ($pessoaId <= 0) {
+            Session::flash('error', 'Informe o ID ou código do titular a ser anonimizado.');
+            Response::redirect('/auditoria/lgpd');
+            return;
+        }
+
+        $result = $this->lgpdService->anonimizarPessoa($pessoaId, $motivo, $currentUser->id, $expurgarDocumentos);
+
+        if (!$result['success']) {
+            Session::flash('error', $result['error'] ?? 'Erro ao processar anonimização.');
+        } else {
+            Session::flash('success', "Titular anonimizado com sucesso! Protocolo oficial gerado: {$result['protocolo']}.");
+        }
+
+        Response::redirect('/auditoria/lgpd');
     }
 }

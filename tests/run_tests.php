@@ -575,6 +575,9 @@ $t->run('AuthService: Autenticação segura com verificação de senha bcrypt', 
     // Logout
     $auth->logout();
     $t->assert(!$auth->check(), 'Auth::check deve retornar false após logout');
+
+    // Re-autentica como administrador para manter o contexto nos testes subsequentes
+    $auth->login('admin@gestaosocial.org', 'demo123');
 });
 
 $t->run('FormValidator & FamiliaService: Normalização monetária brasileira (ex: 1.000,00 e 1000)', function() use ($t) {
@@ -614,6 +617,163 @@ $t->run('FormValidator & FamiliaService: Normalização monetária brasileira (e
     $t->assert($res['success'], 'Deve criar família com valores monetários formatados');
     $t->assertEquals(1850.50, $res['familia']->rendaFamiliar, 'Renda deve ser gravada numericamente como float 1850.50');
     $t->assertEquals(920.00, $res['familia']->despesasMensais, 'Despesas devem ser gravadas numericamente como float 920.00');
+});
+
+$t->run('Core: QrCode nativo e TOTP RFC 6238 (Dois Fatores)', function() use ($t) {
+    // 1. QrCode puro
+    $svg = \App\Core\QrCode::svg('https://gestaosocial.org/validar/123', 180);
+    $t->assert(str_starts_with($svg, '<svg') && str_ends_with(trim($svg), '</svg>'), 'QrCode::svg deve gerar SVG XML válido');
+    $t->assert(str_contains($svg, 'viewBox="0 0 21 21"') || str_contains($svg, 'viewBox='), 'QrCode deve conter viewBox de matriz 2D');
+
+    // 2. TOTP
+    $secret = \App\Core\Totp::generateSecret(16);
+    $t->assertEquals(16, strlen($secret), 'Segredo TOTP deve possuir 16 caracteres Base32');
+    $code = \App\Core\Totp::calculateCode($secret);
+    $t->assertEquals(6, strlen($code), 'Código TOTP deve ter exatamente 6 dígitos');
+    $t->assert(\App\Core\Totp::verify($secret, $code), 'Código atual deve ser verificado com sucesso');
+    $t->assert(!\App\Core\Totp::verify($secret, '000000') || $code === '000000', 'Código aleatório falso deve ser rejeitado');
+
+    // 3. Backup Codes
+    $backups = \App\Core\Totp::generateBackupCodes(8);
+    $t->assertEquals(8, count($backups), 'Deve gerar 8 códigos de backup');
+    $t->assert((bool)preg_match('/^[A-Z0-9]{4}-[A-Z0-9]{4}$/', $backups[0]), 'Formato de código de backup deve ser XXXX-XXXX');
+
+    // 4. Provisioning URI
+    $uri = \App\Core\Totp::getProvisioningUri('teste@gestaosocial.org', $secret, 'Gestão Social');
+    $t->assert(str_starts_with($uri, 'otpauth://totp/'), 'URI deve iniciar com otpauth://totp/');
+    $t->assert(str_contains($uri, 'secret=' . $secret), 'URI deve conter o segredo Base32');
+});
+
+$t->run('PdfService & Pdf Core: Emissão binária de Termos, Prontuários e Recibos', function() use ($t) {
+    /** @var \App\Services\PdfService $pdfService */
+    $pdfService = \App\Core\Container::resolve(\App\Services\PdfService::class);
+
+    // Termo de Benefício
+    $pdfTermo = $pdfService->gerarTermoBeneficio(1)->output();
+    $t->assert(str_starts_with($pdfTermo, '%PDF-1.4'), 'Termo de Benefício deve ser um PDF binário versão 1.4');
+    $t->assert(str_contains($pdfTermo, '%%EOF'), 'PDF deve conter o terminador %%EOF');
+    $t->assert(str_contains($pdfTermo, 'RECEBIMENTO DE BENEF') || str_contains($pdfTermo, 'TERMO DE CONCESS'), 'PDF deve conter o título oficial do termo');
+
+    // Prontuário Socioassistencial da Família
+    $pdfProntuario = $pdfService->gerarProntuarioFamilia(1)->output();
+    $t->assert(str_starts_with($pdfProntuario, '%PDF-1.4'), 'Prontuário da Família deve ser um PDF binário 1.4');
+    $t->assert(str_contains($pdfProntuario, 'SOCIOASSISTENCIAL'), 'Prontuário deve conter cabeçalho');
+
+    // Recibo de Doação
+    $pdfRecibo = $pdfService->gerarReciboDoacao(1)->output();
+    $t->assert(str_starts_with($pdfRecibo, '%PDF-1.4'), 'Recibo de Doação deve ser um PDF binário 1.4');
+    $t->assert(str_contains($pdfRecibo, 'RECIBO OFICIAL'), 'Recibo deve conter título oficial');
+});
+
+$t->run('DocumentoService: Anexação Segura fora do Webroot com isolamento e hash', function() use ($t) {
+    /** @var \App\Services\DocumentoService $docService */
+    $docService = \App\Core\Container::resolve(\App\Services\DocumentoService::class);
+
+    // Validação de extensão não permitida
+    $falhaExt = $docService->salvarArquivo('familia', 1, [
+        'name' => 'malware.php',
+        'type' => 'application/x-php',
+        'size' => 1024,
+        'tmp_name' => '',
+        'error' => UPLOAD_ERR_OK
+    ], 'outro');
+    $t->assert(!$falhaExt['success'], 'Deve rejeitar arquivos com extensões executáveis (.php)');
+
+    // Mock de upload válido
+    $tmpFile = tempnam(sys_get_temp_dir(), 'test_doc_');
+    file_put_contents($tmpFile, '%PDF-1.4 fake pdf test content for unit testing');
+
+    $sucesso = $docService->salvarArquivo('familia', 1, [
+        'name' => 'comprovante_residencia.pdf',
+        'type' => 'application/pdf',
+        'size' => filesize($tmpFile),
+        'tmp_name' => $tmpFile,
+        'error' => UPLOAD_ERR_OK
+    ], 'comprovante_residencia', 'Conta de Luz');
+
+    $t->assert($sucesso['success'], 'Deve salvar documento PDF válido com sucesso');
+    $doc = $sucesso['documento'];
+    $t->assert(!empty($doc->nomeArquivo), 'Deve gerar nome seguro do arquivo');
+    $t->assert(!str_contains($doc->caminhoRelativo, 'public'), 'Arquivo NÃO deve estar sob a pasta public');
+
+    // Listagem
+    $docs = $docService->listarPorEntidade('familia', 1);
+    $t->assert(count($docs) >= 1, 'Deve listar o documento cadastrado');
+
+    // Exclusão segura
+    $resExcluir = $docService->excluir($doc->id, 1);
+    $t->assert($resExcluir, 'Deve excluir o documento com sucesso');
+});
+
+$t->run('NotificacaoService: Comunicação com o Cidadão (WhatsApp / SMS)', function() use ($t) {
+    /** @var \App\Services\NotificacaoService $notifService */
+    $notifService = \App\Core\Container::resolve(\App\Services\NotificacaoService::class);
+
+    // Templates
+    $tpl = \App\Services\NotificacaoService::template('lembrete_atendimento', [
+        'nome' => 'Ana Clara',
+        'data' => '25/03/2026',
+        'hora' => '14:30'
+    ]);
+    $t->assert(str_contains($tpl, 'Ana Clara') && str_contains($tpl, '25/03/2026'), 'Template deve interpolar variáveis corretamente');
+
+    // Disparo
+    $res = $notifService->enviar([
+        'destinatarioNome' => 'Carlos Eduardo',
+        'destinatarioContato' => '(61) 99999-1111',
+        'canal' => 'whatsapp',
+        'tipoMensagem' => 'aviso_beneficio',
+        'mensagem' => 'Seu benefício foi liberado.',
+        'entidadeTipo' => 'beneficio',
+        'entidadeId' => 1
+    ]);
+
+    $t->assert($res['success'], 'Disparo de notificação deve ter sucesso');
+    $t->assertEquals('enviado', $res['notificacao']->status);
+    $t->assert(str_contains($res['notificacao']->respostaProvedor, 'SIMULADO_OK') || str_contains($res['notificacao']->respostaProvedor, 'OK'), 'Deve registrar confirmação do provedor');
+
+    // Listagem
+    $historico = $notifService->listarPorEntidade('beneficio', 1);
+    $t->assert(count($historico) >= 1, 'Histórico de notificações da entidade deve conter a mensagem enviada');
+});
+
+$t->run('LgpdService: Anonimização de Titular (Art. 18 LGPD) e Varredura de Inativos', function() use ($t) {
+    /** @var \App\Services\PessoaService $pessoaService */
+    $pessoaService = \App\Core\Container::resolve(\App\Services\PessoaService::class);
+    /** @var \App\Services\LgpdService $lgpdService */
+    $lgpdService = \App\Core\Container::resolve(\App\Services\LgpdService::class);
+
+    // 1. Cadastra uma pessoa para teste de anonimização (com CPF válido)
+    $resPessoa = $pessoaService->salvar([
+        'nomeCompleto' => 'Fulano de Tal da Silva para Anonimizar',
+        'nomeSocial' => 'Fulaninho',
+        'dataNascimento' => '1985-05-15',
+        'cpf' => '111.444.777-35',
+        'telefone' => '(61) 98765-4321',
+        'escolaridade' => 'Ensino Médio Completo',
+        'situacaoOcupacional' => 'Desempregado',
+        'observacoes' => 'Informação clínica e psicossocial altamente sensível.'
+    ]);
+    $t->assert($resPessoa['success'], 'Deve criar pessoa para teste de anonimização');
+    $pessoaId = $resPessoa['pessoa']->id;
+
+    // 2. Executa anonimização Art. 18
+    $resAnon = $lgpdService->anonimizarPessoa($pessoaId, 'Exercício de direito pelo titular (Art. 18, VI)', 1, true);
+    $t->assert($resAnon['success'], 'Anonimização deve retornar sucesso');
+    $t->assert(str_starts_with($resAnon['protocolo'], 'LGPD-'), 'Protocolo oficial deve ser gerado');
+
+    // 3. Verifica dados anonimizados
+    $pessoaAnon = $pessoaService->obterPorId($pessoaId);
+    $t->assert(str_contains($pessoaAnon->nomeCompleto, 'Cidadão Anonimizado'), 'Nome completo deve estar anonimizado');
+    $t->assert(empty($pessoaAnon->cpf), 'CPF deve estar purgado/nulo');
+    $t->assert(empty($pessoaAnon->nomeSocial), 'Nome social deve estar nulo');
+    $t->assert(empty($pessoaAnon->telefone), 'Telefone deve estar nulo');
+    $t->assert(str_contains($pessoaAnon->observacoes, 'DADOS PESSOAIS E SENSÍVEIS PURGADOS'), 'Observações devem conter aviso formal de purga');
+    $t->assertEquals('Inativo', $pessoaAnon->situacaoCadastro, 'Situação cadastral deve ser Inativo');
+
+    // 4. Listar protocolos
+    $solicitacoes = $lgpdService->listarSolicitacoes();
+    $t->assert(count($solicitacoes) >= 1, 'Deve registrar protocolo na lista de solicitações LGPD');
 });
 
 // Finaliza e imprime relatório

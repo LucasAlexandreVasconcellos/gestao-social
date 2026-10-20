@@ -41,6 +41,10 @@ final class AuthController
         if ($password === '') {
             $success = $this->authService->loginDemo($email);
             if ($success) {
+                if ($this->authService->hasPending2fa()) {
+                    Response::redirect('/login/2fa');
+                    return;
+                }
                 Session::flash('success', 'Bem-vindo à Plataforma de Gestão Social e Assistencial!');
                 Response::redirect('/dashboard');
                 return;
@@ -55,8 +59,126 @@ final class AuthController
             return;
         }
 
+        if ($this->authService->hasPending2fa()) {
+            Response::redirect('/login/2fa');
+            return;
+        }
+
         Session::flash('success', 'Bem-vindo à Plataforma de Gestão Social e Assistencial!');
         Response::redirect('/dashboard');
+    }
+
+    public function login2fa(Request $request): string
+    {
+        if (!$this->authService->hasPending2fa()) {
+            Response::redirect('/login');
+            return '';
+        }
+
+        $pendingUser = $this->authService->getPending2faUser();
+        $isBackup = (bool)$request->query('backup', false);
+
+        return View::render('auth/login_2fa', [
+            'pendingUser' => $pendingUser,
+            'isBackup' => $isBackup,
+            'error' => Session::flash('error')
+        ], 'layouts/auth');
+    }
+
+    public function verify2fa(Request $request): void
+    {
+        if (!$this->authService->hasPending2fa()) {
+            Response::redirect('/login');
+            return;
+        }
+
+        $code = trim((string)$request->post('code', ''));
+        $isBackup = (bool)$request->post('is_backup', false);
+
+        if (empty($code)) {
+            Session::flash('error', 'Por favor informe o código.');
+            Response::redirect('/login/2fa' . ($isBackup ? '?backup=1' : ''));
+            return;
+        }
+
+        $valid = $this->authService->verify2faLogin($code, $isBackup);
+
+        if ($valid) {
+            Session::flash('success', 'Autenticação em dois fatores confirmada com sucesso!');
+            Response::redirect('/dashboard');
+            return;
+        }
+
+        Session::flash('error', 'Código de verificação incorreto ou expirado. Tente novamente.');
+        Response::redirect('/login/2fa' . ($isBackup ? '?backup=1' : ''));
+    }
+
+    public function cancel2fa(Request $request): void
+    {
+        $this->authService->cancelPending2fa();
+        Session::flash('info', 'Autenticação cancelada.');
+        Response::redirect('/login');
+    }
+
+    public function twoFactorProfile(Request $request): string
+    {
+        $user = $this->authService->getCurrentUserFull();
+        if (!$user) {
+            Response::redirect('/login');
+            return '';
+        }
+
+        $setup = null;
+        if (!$user->doisFatoresAtivo) {
+            $setup = $this->authService->prepareTwoFactorSetup($user->id);
+        }
+
+        return View::render('usuarios/dois_fatores', [
+            'user' => $user,
+            'setup' => $setup,
+            'success' => Session::flash('success'),
+            'error' => Session::flash('error'),
+            'info' => Session::flash('info')
+        ]);
+    }
+
+    public function confirmTwoFactor(Request $request): void
+    {
+        $user = $this->authService->getCurrentUser();
+        if (!$user) {
+            Response::redirect('/login');
+            return;
+        }
+
+        $code = trim((string)$request->post('code', ''));
+        if (empty($code)) {
+            Session::flash('error', 'Informe o código numérico de 6 dígitos.');
+            Response::redirect('/meu-perfil/2fa');
+            return;
+        }
+
+        $ok = $this->authService->confirmTwoFactorSetup($user->id, $code);
+
+        if ($ok) {
+            Session::flash('success', 'Segundo Fator de Autenticação (2FA / TOTP) ativado com sucesso!');
+        } else {
+            Session::flash('error', 'Código TOTP incorreto. Verifique o relógio do seu smartphone e digite os 6 dígitos gerados pelo autenticador.');
+        }
+
+        Response::redirect('/meu-perfil/2fa');
+    }
+
+    public function disableTwoFactor(Request $request): void
+    {
+        $user = $this->authService->getCurrentUser();
+        if (!$user) {
+            Response::redirect('/login');
+            return;
+        }
+
+        $this->authService->disableTwoFactor($user->id);
+        Session::flash('info', 'Autenticação em dois fatores desativada com sucesso.');
+        Response::redirect('/meu-perfil/2fa');
     }
 
     public function logout(Request $request): void

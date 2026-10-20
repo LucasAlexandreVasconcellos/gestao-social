@@ -86,4 +86,66 @@ final class UsuarioRepositoryDemo implements UsuarioRepositoryInterface
         Session::set(self::SESSION_KEY, $usuarios);
         return true;
     }
+
+    public function setTwoFactorSecret(int $userId, string $secret, array $backupCodes): bool
+    {
+        $usuarios = Session::get(self::SESSION_KEY, []);
+        if (!isset($usuarios[$userId])) {
+            return false;
+        }
+
+        $usuarios[$userId]->doisFatoresSecret = $secret;
+        $usuarios[$userId]->doisFatoresBackupCodes = $backupCodes;
+        Session::set(self::SESSION_KEY, $usuarios);
+        return true;
+    }
+
+    public function enableTwoFactor(int $userId): bool
+    {
+        $usuarios = Session::get(self::SESSION_KEY, []);
+        if (!isset($usuarios[$userId])) {
+            return false;
+        }
+
+        $usuarios[$userId]->doisFatoresAtivo = true;
+        Session::set(self::SESSION_KEY, $usuarios);
+        return true;
+    }
+
+    public function disableTwoFactor(int $userId): bool
+    {
+        $usuarios = Session::get(self::SESSION_KEY, []);
+        if (!isset($usuarios[$userId])) {
+            return false;
+        }
+
+        $usuarios[$userId]->doisFatoresAtivo = false;
+        $usuarios[$userId]->doisFatoresSecret = null;
+        $usuarios[$userId]->doisFatoresBackupCodes = [];
+        Session::set(self::SESSION_KEY, $usuarios);
+        return true;
+    }
+
+    public function consumeBackupCode(int $userId, string $code): bool
+    {
+        $usuarios = Session::get(self::SESSION_KEY, []);
+        if (!isset($usuarios[$userId])) {
+            return false;
+        }
+
+        $cleanTarget = strtoupper(str_replace(['-', ' '], '', trim($code)));
+        $codes = $usuarios[$userId]->doisFatoresBackupCodes ?? [];
+
+        foreach ($codes as $idx => $storedCode) {
+            $cleanStored = strtoupper(str_replace(['-', ' '], '', trim($storedCode)));
+            if ($cleanStored === $cleanTarget) {
+                unset($codes[$idx]);
+                $usuarios[$userId]->doisFatoresBackupCodes = array_values($codes);
+                Session::set(self::SESSION_KEY, $usuarios);
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

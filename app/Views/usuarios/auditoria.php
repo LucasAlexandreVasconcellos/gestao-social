@@ -1,7 +1,10 @@
-<div class="page-header">
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
     <div class="page-title">
         <h1>Trilha de Auditoria e Segurança (LGPD)</h1>
         <p>Rastreabilidade de operações sensíveis, alterações cadastrais e movimentações no sistema</p>
+    </div>
+    <div>
+        <a href="/auditoria/lgpd" class="btn btn-primary btn-sm">⚖️ Governança & Anonimização LGPD (Art. 18)</a>
     </div>
 </div>
 

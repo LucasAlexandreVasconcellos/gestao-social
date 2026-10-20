@@ -3,6 +3,9 @@
 !/storage/sessions/.gitkeep
 /storage/logs/*
 !/storage/logs/.gitkeep
+/storage/documentos/*
+!/storage/documentos/.gitkeep
+!/storage/documentos/.htaccess
 
 # Arquivos de Ambiente e Credenciais
 .env

@@ -32,6 +32,15 @@ final class AuthService
         );
     }
 
+    public function getCurrentUserFull(): ?Usuario
+    {
+        $userData = Session::get('user');
+        if (!$userData) {
+            return null;
+        }
+        return $this->usuarioRepo->findById((int)$userData['id']);
+    }
+
     public function check(): bool
     {
         return $this->getCurrentUser() !== null;
@@ -79,6 +88,13 @@ final class AuthService
             }
         }
 
+        // Se o usuário possuir Segundo Fator de Autenticação (2FA / TOTP) ativo
+        if ($user->doisFatoresAtivo) {
+            Session::set('2fa_pending_user_id', $user->id);
+            $this->auditLog->log('Login Pendente 2FA', 'Usuario', $user->id, "Credenciais validadas para {$user->nome}. Aguardando código TOTP/2FA.");
+            return true;
+        }
+
         // Regenera ID da sessão (OWASP A07 - Prevenção de Session Fixation)
         Session::regenerate(true);
         Session::set('user', $user->toArray());
@@ -99,6 +115,12 @@ final class AuthService
             return false;
         }
 
+        if ($user->doisFatoresAtivo) {
+            Session::set('2fa_pending_user_id', $user->id);
+            $this->auditLog->log('Login Pendente 2FA', 'Usuario', $user->id, "Acesso rápido para {$user->nome}. Aguardando código TOTP/2FA.");
+            return true;
+        }
+
         Session::regenerate(true);
         Session::set('user', $user->toArray());
 
@@ -107,6 +129,121 @@ final class AuthService
         }
 
         $this->auditLog->log('Login Demonstrativo', 'Usuario', $user->id, "Acesso concedido para {$user->nome} ({$user->perfil})");
+        return true;
+    }
+
+    public function hasPending2fa(): bool
+    {
+        return Session::has('2fa_pending_user_id');
+    }
+
+    public function getPending2faUser(): ?Usuario
+    {
+        $id = Session::get('2fa_pending_user_id');
+        return $id ? $this->usuarioRepo->findById((int)$id) : null;
+    }
+
+    public function verify2faLogin(string $code, bool $isBackup = false): bool
+    {
+        $user = $this->getPending2faUser();
+        if (!$user) {
+            return false;
+        }
+
+        $valid = false;
+        if ($isBackup) {
+            $valid = $this->usuarioRepo->consumeBackupCode($user->id, $code);
+        } else {
+            if (!empty($user->doisFatoresSecret)) {
+                $valid = \App\Core\Totp::verify($user->doisFatoresSecret, $code);
+            }
+        }
+
+        if ($valid) {
+            Session::remove('2fa_pending_user_id');
+            Session::regenerate(true);
+            Session::set('user', $user->toArray());
+
+            if (\App\Core\Database::isConnected()) {
+                \App\Core\Database::setAuditContext($user->id, $user->email);
+            }
+
+            $tipoStr = $isBackup ? 'Código de Backup' : 'Aplicativo Autenticador TOTP';
+            $this->auditLog->log('Login 2FA Concluído', 'Usuario', $user->id, "Autenticação 2FA via {$tipoStr} concluída para {$user->nome}");
+            return true;
+        }
+
+        $this->auditLog->log('Falha 2FA', 'Usuario', $user->id, "Tentativa de 2FA falhou para {$user->nome}");
+        return false;
+    }
+
+    public function cancelPending2fa(): void
+    {
+        Session::remove('2fa_pending_user_id');
+    }
+
+    public function prepareTwoFactorSetup(int $userId): ?array
+    {
+        $user = $this->usuarioRepo->findById($userId);
+        if (!$user) {
+            return null;
+        }
+
+        $secret = \App\Core\Totp::generateSecret();
+        $uri = \App\Core\Totp::getProvisioningUri($user->email, $secret, 'Gestão Social');
+        $backupCodes = \App\Core\Totp::generateBackupCodes(8);
+        $svg = \App\Core\QrCode::svg($uri, 180);
+
+        Session::set('_2fa_setup_' . $userId, [
+            'secret' => $secret,
+            'backup_codes' => $backupCodes,
+            'uri' => $uri
+        ]);
+
+        return [
+            'secret' => $secret,
+            'uri' => $uri,
+            'svg' => $svg,
+            'backup_codes' => $backupCodes
+        ];
+    }
+
+    public function confirmTwoFactorSetup(int $userId, string $code): bool
+    {
+        $setup = Session::get('_2fa_setup_' . $userId);
+        if (!$setup || empty($setup['secret'])) {
+            return false;
+        }
+
+        if (!\App\Core\Totp::verify($setup['secret'], $code)) {
+            return false;
+        }
+
+        $this->usuarioRepo->setTwoFactorSecret($userId, $setup['secret'], $setup['backup_codes']);
+        $this->usuarioRepo->enableTwoFactor($userId);
+
+        $currentUser = Session::get('user');
+        if ($currentUser && (int)$currentUser['id'] === $userId) {
+            $currentUser['doisFatoresAtivo'] = true;
+            Session::set('user', $currentUser);
+        }
+
+        Session::remove('_2fa_setup_' . $userId);
+        $this->auditLog->log('2FA Habilitado', 'Usuario', $userId, "Usuário ativou o Segundo Fator de Autenticação.");
+        return true;
+    }
+
+    public function disableTwoFactor(int $userId): bool
+    {
+        $this->usuarioRepo->disableTwoFactor($userId);
+
+        $currentUser = Session::get('user');
+        if ($currentUser && (int)$currentUser['id'] === $userId) {
+            $currentUser['doisFatoresAtivo'] = false;
+            Session::set('user', $currentUser);
+        }
+
+        $this->auditLog->log('2FA Desabilitado', 'Usuario', $userId, "Usuário desativou o Segundo Fator de Autenticação.");
         return true;
     }
 

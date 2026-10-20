@@ -8,12 +8,14 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Services\DocumentoService;
 use App\Services\PessoaService;
 
 final class PessoaController
 {
     public function __construct(
-        private PessoaService $pessoaService
+        private PessoaService $pessoaService,
+        private DocumentoService $documentoService
     ) {}
 
     public function index(Request $request): string
@@ -38,10 +40,12 @@ final class PessoaController
         }
 
         $historicoVinculos = $this->pessoaService->obterHistoricoVinculos($id);
+        $documentos = $this->documentoService->listarPorEntidade('pessoa', $id);
 
         return View::render('pessoas/show', [
             'pessoa' => $pessoa,
-            'historicoVinculos' => $historicoVinculos
+            'historicoVinculos' => $historicoVinculos,
+            'documentos' => $documentos
         ]);
     }
 

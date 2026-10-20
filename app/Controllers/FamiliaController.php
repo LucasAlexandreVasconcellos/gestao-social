@@ -8,12 +8,16 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Services\DocumentoService;
 use App\Services\FamiliaService;
+use App\Services\PdfService;
 
 final class FamiliaController
 {
     public function __construct(
-        private FamiliaService $familiaService
+        private FamiliaService $familiaService,
+        private PdfService $pdfService,
+        private DocumentoService $documentoService
     ) {}
 
     public function index(Request $request): string
@@ -69,13 +73,16 @@ final class FamiliaController
             return View::render('errors/404', ['uri' => $request->getUri()]);
         }
 
+        $documentos = $this->documentoService->listarPorEntidade('familia', $id);
+
         return View::render('familias/show', [
             'familia' => $ficha['familia'],
             'integrantes' => $ficha['integrantes'],
             'avaliacoes' => $ficha['avaliacoes'],
             'ultimaAvaliacao' => $ficha['ultimaAvaliacao'],
             'atendimentos' => $ficha['atendimentos'],
-            'beneficios' => $ficha['beneficios']
+            'beneficios' => $ficha['beneficios'],
+            'documentos' => $documentos
         ]);
     }
 
@@ -142,5 +149,17 @@ final class FamiliaController
 
         Session::flash('success', 'Integrante desvinculado da família (histórico preservado no cadastro da pessoa).');
         Response::redirect("/familias/{$familiaId}#integrantes");
+    }
+
+    public function prontuarioPdf(Request $request): void
+    {
+        $id = (int)$request->param('id');
+        $pdf = $this->pdfService->gerarProntuarioFamilia($id);
+        $filename = "prontuario_familia_{$id}.pdf";
+        if ($request->query('download') === '1') {
+            $pdf->download($filename);
+        } else {
+            $pdf->inline($filename);
+        }
     }
 }

@@ -33,12 +33,19 @@ CREATE TABLE IF NOT EXISTS gestao_social.usuarios (
     senha_hash VARCHAR(255) NOT NULL,
     perfil_id BIGINT NOT NULL,
     ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    dois_fatores_ativo BOOLEAN NOT NULL DEFAULT FALSE,
+    dois_fatores_secret VARCHAR(64) NULL,
+    dois_fatores_backup_codes TEXT NULL,
     ultimo_acesso TIMESTAMP WITH TIME ZONE,
     data_criacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_usuarios_perfil FOREIGN KEY (perfil_id) 
         REFERENCES gestao_social.perfis(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT chk_usuarios_email CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$')
 );
+
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_ativo BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_secret VARCHAR(64) NULL;
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_backup_codes TEXT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_usuarios_email_lower ON gestao_social.usuarios (LOWER(email));
 
@@ -1493,3 +1500,77 @@ CREATE INDEX IF NOT EXISTS idx_mov_produto_lote ON gestao_social.movimentacoes_e
 CREATE INDEX IF NOT EXISTS idx_mov_entrega ON gestao_social.movimentacoes_estoque(entrega_id);
 CREATE INDEX IF NOT EXISTS idx_mov_doacao ON gestao_social.movimentacoes_estoque(doacao_id);
 CREATE INDEX IF NOT EXISTS idx_mov_data ON gestao_social.movimentacoes_estoque(data_movimentacao);
+
+-- -----------------------------------------------------------------------------
+-- 10. DOCUMENTOS ANEXOS (UPLOAD SEGURO), NOTIFICAÇÕES E GOVERNANÇA LGPD
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS gestao_social.documentos (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    entidade_tipo VARCHAR(30) NOT NULL, -- 'familia', 'pessoa'
+    entidade_id BIGINT NOT NULL,
+    tipo_documento VARCHAR(50) NOT NULL, -- 'comprovante_residencia', 'rg_cnh', 'laudo_medico_pcd', etc.
+    nome_original VARCHAR(255) NOT NULL,
+    nome_arquivo VARCHAR(255) NOT NULL,
+    caminho_arquivo VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    tamanho_bytes BIGINT NOT NULL,
+    hash_sha256 VARCHAR(64) NOT NULL,
+    descricao TEXT,
+    usuario_id BIGINT,
+    data_upload TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_documentos_usuario FOREIGN KEY (usuario_id)
+        REFERENCES gestao_social.usuarios(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    CONSTRAINT chk_documentos_entidade CHECK (entidade_tipo IN ('familia', 'pessoa', 'atendimento'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_documentos_entidade ON gestao_social.documentos(entidade_tipo, entidade_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_hash ON gestao_social.documentos(hash_sha256);
+
+CREATE TABLE IF NOT EXISTS gestao_social.notificacoes (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    entidade_tipo VARCHAR(30) NOT NULL, -- 'atendimento', 'beneficio', 'projeto', 'geral'
+    entidade_id BIGINT,
+    destinatario_nome VARCHAR(150) NOT NULL,
+    destinatario_contato VARCHAR(50) NOT NULL,
+    canal VARCHAR(20) NOT NULL, -- 'whatsapp', 'sms', 'email'
+    tipo_mensagem VARCHAR(50) NOT NULL, -- 'lembrete_atendimento', 'aviso_beneficio', 'convocacao_projeto', 'personalizado'
+    mensagem TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'enviado', -- 'enviado', 'simulado', 'falha'
+    resposta_provedor TEXT,
+    usuario_id BIGINT,
+    data_envio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notificacoes_usuario FOREIGN KEY (usuario_id)
+        REFERENCES gestao_social.usuarios(id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notificacoes_entidade ON gestao_social.notificacoes(entidade_tipo, entidade_id);
+CREATE INDEX IF NOT EXISTS idx_notificacoes_canal ON gestao_social.notificacoes(canal);
+CREATE INDEX IF NOT EXISTS idx_notificacoes_data ON gestao_social.notificacoes(data_envio);
+
+CREATE TABLE IF NOT EXISTS gestao_social.lgpd_solicitacoes (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    protocolo VARCHAR(50) NOT NULL UNIQUE,
+    pessoa_id BIGINT NOT NULL,
+    motivo TEXT NOT NULL,
+    operador_id BIGINT,
+    documentos_expurgados INT NOT NULL DEFAULT 0,
+    data_solicitacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(30) NOT NULL DEFAULT 'Concluído',
+    CONSTRAINT fk_lgpd_operador FOREIGN KEY (operador_id)
+        REFERENCES gestao_social.usuarios(id) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_lgpd_protocolo ON gestao_social.lgpd_solicitacoes(protocolo);
+CREATE INDEX IF NOT EXISTS idx_lgpd_pessoa ON gestao_social.lgpd_solicitacoes(pessoa_id);
+
+-- Triggers de auditoria imutável para as novas tabelas
+DROP TRIGGER IF EXISTS tg_audit_documentos ON gestao_social.documentos;
+CREATE TRIGGER tg_audit_documentos AFTER INSERT OR UPDATE OR DELETE ON gestao_social.documentos FOR EACH ROW EXECUTE FUNCTION gestao_social.trg_auditar_operacao();
+
+DROP TRIGGER IF EXISTS tg_audit_notificacoes ON gestao_social.notificacoes;
+CREATE TRIGGER tg_audit_notificacoes AFTER INSERT OR UPDATE OR DELETE ON gestao_social.notificacoes FOR EACH ROW EXECUTE FUNCTION gestao_social.trg_auditar_operacao();
+
+DROP TRIGGER IF EXISTS tg_audit_lgpd ON gestao_social.lgpd_solicitacoes;
+CREATE TRIGGER tg_audit_lgpd AFTER INSERT OR UPDATE OR DELETE ON gestao_social.lgpd_solicitacoes FOR EACH ROW EXECUTE FUNCTION gestao_social.trg_auditar_operacao();
+

@@ -10,12 +10,14 @@ use App\Core\Session;
 use App\Core\View;
 use App\Services\DoacaoService;
 use App\Services\EstoqueService;
+use App\Services\PdfService;
 
 final class DoacaoController
 {
     public function __construct(
         private DoacaoService $doacaoService,
-        private EstoqueService $estoqueService
+        private EstoqueService $estoqueService,
+        private PdfService $pdfService
     ) {}
 
     public function index(Request $request): string
@@ -93,5 +95,17 @@ final class DoacaoController
         return View::render('doacoes/show', [
             'doacao' => $doacao
         ]);
+    }
+
+    public function reciboPdf(Request $request): void
+    {
+        $id = (int)$request->param('id');
+        $pdf = $this->pdfService->gerarReciboDoacao($id);
+        $filename = "recibo_doacao_{$id}.pdf";
+        if ($request->query('download') === '1') {
+            $pdf->download($filename);
+        } else {
+            $pdf->inline($filename);
+        }
     }
 }

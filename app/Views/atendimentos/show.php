@@ -19,6 +19,7 @@ use App\Models\Familia;
     <?php if ($familia): ?>
       <a href="/familias/<?= $familia->id ?>" class="btn btn-secondary btn-sm">Ver Ficha da Família</a>
     <?php endif; ?>
+    <button type="button" onclick="document.getElementById('modal-notificacao').style.display='flex'" class="btn btn-primary btn-sm no-print">📲 Notificar Cidadão</button>
     <button onclick="window.print()" class="btn btn-outline btn-sm no-print">Imprimir Registro</button>
   </div>
 </div>
@@ -144,3 +145,60 @@ use App\Models\Familia;
     </form>
   </div>
 </div>
+
+<!-- Modal de Envio de Notificação ao Cidadão -->
+<div id="modal-notificacao" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: #ffffff; width: 100%; max-width: 520px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div style="background: var(--primary); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 16px; font-weight: 700; margin: 0;">📲 Disparar Notificação ao Cidadão</h3>
+      <button type="button" onclick="document.getElementById('modal-notificacao').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+    </div>
+    <form action="/notificacoes/enviar" method="POST" style="padding: 20px;">
+      <?= \App\Core\View::render('partials/csrf', [], null) ?>
+      <input type="hidden" name="entidadeTipo" value="atendimento">
+      <input type="hidden" name="entidadeId" value="<?= $atendimento->id ?>">
+      <input type="hidden" name="redirect" value="/atendimentos/<?= $atendimento->id ?>">
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Canal de Envio *</label>
+        <select name="canal" class="form-select" required>
+          <option value="whatsapp">WhatsApp (Oficial)</option>
+          <option value="sms">SMS Convencional</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Destinatário *</label>
+        <input type="text" name="destinatarioNome" class="form-control" required value="<?= htmlspecialchars($familia ? $familia->pessoaReferenciaNome : 'Cidadão', ENT_QUOTES, 'UTF-8') ?>">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Telefone / WhatsApp com DDD *</label>
+        <input type="text" name="destinatarioContato" class="form-control mask-phone" required placeholder="(00) 00000-0000" value="<?= htmlspecialchars($familia->telefone ?? '', ENT_QUOTES, 'UTF-8') ?>">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Tipo de Notificação</label>
+        <select name="tipoMensagem" class="form-select">
+          <option value="lembrete_atendimento">Lembrete de Atendimento / Retorno</option>
+          <option value="personalizado">Comunicado Personalizado</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label class="form-label">Texto da Mensagem *</label>
+        <textarea name="mensagem" class="form-control" rows="4" required style="font-size: 13px;"><?= htmlspecialchars(
+          "Olá, " . ($familia ? $familia->pessoaReferenciaNome : 'Cidadão') . "! Informamos sobre o andamento do seu atendimento #" . $atendimento->id . " realizado na Assistência Social. Data do atendimento: " . \App\Helpers\FormatHelper::date($atendimento->dataAtendimento) . ($atendimento->retornoPrevisto ? ". Retorno previsto: " . \App\Helpers\FormatHelper::date($atendimento->retornoPrevisto) : "") . ". Em caso de dúvidas, contate nossa equipe.",
+          ENT_QUOTES,
+          'UTF-8'
+        ) ?></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="document.getElementById('modal-notificacao').style.display='none'" class="btn btn-outline btn-sm">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Enviar Mensagem</button>
+      </div>
+    </form>
+  </div>
+</div>
+

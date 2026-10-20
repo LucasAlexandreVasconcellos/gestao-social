@@ -16,7 +16,9 @@ use App\Models\Familia;
   </div>
 
   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <button onclick="window.print()" class="btn btn-primary btn-sm">Imprimir Recibo</button>
+    <a href="/beneficios/<?= $entrega->id ?>/termo-pdf?download=1" class="btn btn-primary btn-sm" target="_blank" title="Baixar Termo Oficial de Concessão em PDF">📄 Emitir Termo Oficial (PDF)</a>
+    <button type="button" onclick="document.getElementById('modal-notificacao-beneficio').style.display='flex'" class="btn btn-outline btn-sm">📲 Notificar WhatsApp</button>
+    <button onclick="window.print()" class="btn btn-outline btn-sm">Imprimir na Tela</button>
 
     <?php if ($entrega->situacao === 'Preparada'): ?>
       <form action="/beneficios/<?= $entrega->id ?>/efetivar" method="POST" style="display: inline;" data-confirm="Deseja confirmar a efetivação da entrega? O estoque dos itens correspondentes será baixado.">
@@ -121,5 +123,61 @@ use App\Models\Familia;
       <div style="font-weight: 600; font-size: 13px;"><?= htmlspecialchars($entrega->responsavelDistribuicao, ENT_QUOTES, 'UTF-8') ?></div>
       <div style="font-size: 11px; color: var(--text-muted);">Assinatura do Responsável pela Entidade</div>
     </div>
+  </div>
+</div>
+
+<!-- Modal de Envio de Notificação de Benefício -->
+<div id="modal-notificacao-beneficio" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: #ffffff; width: 100%; max-width: 520px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div style="background: var(--primary); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 16px; font-weight: 700; margin: 0;">📲 Notificar Retirada de Benefício</h3>
+      <button type="button" onclick="document.getElementById('modal-notificacao-beneficio').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+    </div>
+    <form action="/notificacoes/enviar" method="POST" style="padding: 20px;">
+      <?= \App\Core\View::render('partials/csrf', [], null) ?>
+      <input type="hidden" name="entidadeTipo" value="beneficio">
+      <input type="hidden" name="entidadeId" value="<?= $entrega->id ?>">
+      <input type="hidden" name="redirect" value="/beneficios/<?= $entrega->id ?>">
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Canal de Envio *</label>
+        <select name="canal" class="form-select" required>
+          <option value="whatsapp">WhatsApp (Oficial)</option>
+          <option value="sms">SMS Convencional</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Beneficiário *</label>
+        <input type="text" name="destinatarioNome" class="form-control" required value="<?= htmlspecialchars($familia ? $familia->pessoaReferenciaNome : 'Beneficiário', ENT_QUOTES, 'UTF-8') ?>">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Telefone / WhatsApp com DDD *</label>
+        <input type="text" name="destinatarioContato" class="form-control mask-phone" required placeholder="(00) 00000-0000" value="<?= htmlspecialchars($familia->telefone ?? '', ENT_QUOTES, 'UTF-8') ?>">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label class="form-label">Tipo de Notificação</label>
+        <select name="tipoMensagem" class="form-select">
+          <option value="aviso_beneficio">Aviso de Liberação / Retirada</option>
+          <option value="personalizado">Comunicado Geral</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 20px;">
+        <label class="form-label">Texto da Mensagem *</label>
+        <textarea name="mensagem" class="form-control" rows="4" required style="font-size: 13px;"><?= htmlspecialchars(
+          "Olá, " . ($familia ? $familia->pessoaReferenciaNome : 'Beneficiário') . "! Seu benefício (" . $entrega->tipoBeneficio . ") cadastrado sob o registro #" . $entrega->id . " está pronto para retirada na sede do Centro Social. Favor comparecer com documento de identificação com foto.",
+          ENT_QUOTES,
+          'UTF-8'
+        ) ?></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="document.getElementById('modal-notificacao-beneficio').style.display='none'" class="btn btn-outline btn-sm">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Enviar Mensagem</button>
+      </div>
+    </form>
   </div>
 </div>

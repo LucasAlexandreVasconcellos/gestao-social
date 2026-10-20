@@ -88,6 +88,10 @@ $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'tr
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
           <span>Relatórios Gerenciais</span>
         </a>
+        <a href="/notificacoes/historico" class="nav-link <?= $isActive('/notificacoes/historico') ?>">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M12 7v4"></path><path d="M12 15h.01"></path></svg>
+          <span>Notificações & WhatsApp</span>
+        </a>
 
         <div class="menu-category">Segurança & Governança</div>
         <a href="/usuarios" class="nav-link <?= $isActive('/usuarios') ?>">
@@ -97,6 +101,14 @@ $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'tr
         <a href="/auditoria" class="nav-link <?= $isActive('/auditoria') ?>">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
           <span>Trilha de Auditoria</span>
+        </a>
+        <a href="/meu-perfil/2fa" class="nav-link <?= $isActive('/meu-perfil/2fa') ?>">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Proteção 2FA</span>
+        </a>
+        <a href="/auditoria/lgpd" class="nav-link <?= $isActive('/auditoria/lgpd') ?>">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+          <span>Governança LGPD</span>
         </a>
       </nav>
 

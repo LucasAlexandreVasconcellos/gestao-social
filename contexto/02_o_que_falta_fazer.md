@@ -1,65 +1,101 @@
 # 📝 02. O Que Falta Fazer / Backlog de Próximos Passos
 
-Este documento detalha as pendências técnicas, tarefas em aberto e oportunidades de evolução do **Sistema de Gestão Social e Assistencial** para que você ou outro desenvolvedor possa dar continuidade direta ao trabalho em outra máquina.
+Este documento detalha o status das funcionalidades e pendências do **Sistema de Gestão Social e Assistencial**. Todas as funcionalidades centrais e técnicas previstas no backlog foram integralmente implementadas e testadas.
 
 ---
 
-## 1. Pendências Imediatas de Infraestrutura
-
-- [ ] **Configurar as Credenciais do PostgreSQL Local:**
-  - O sistema já possui o script automatizado `scripts/setup_database.php`.
-  - Na máquina onde o PostgreSQL estiver rodando, basta executar:
-    ```bash
-    php scripts/setup_database.php [sua_senha_do_postgres]
-    ```
-    Isso criará a base `gestao_social`, executará os 3 scripts SQL em ordem e gerará o arquivo `.env`.
-  - Uma vez configurado, o sistema passa automaticamente a salvar tudo no PostgreSQL.
-
----
-
-## 2. Funcionalidades Recomendadas para Expansão
+## 1. Status das Funcionalidades do Backlog
 
 ### 📄 A. Geração de Documentos em PDF Físico
-- **Situação Atual:** Relatórios podem ser exportados em **CSV** e as páginas possuem formatação para impressão em folha A4 via navegador (`window.print()` e `@media print`).
-- **O que implementar:**
-  - Integrar uma biblioteca como **Dompdf** ou script nativo para gerar PDFs binários com cabeçalho oficial do município/instituição.
-  - Modelos prioritários para PDF:
-    - **Termo de Declaração e Recebimento de Benefício** (com campo para assinatura física ou digital do beneficiário).
-    - **Ficha de Prontuário Socioassistencial Completo** com QR Code para validação de autenticidade.
-    - **Recibo de Doação Financeira** oficial para dedução ou prestação de contas.
+- [x] **Motor Nativo de PDF 1.4 (`app/Core/Pdf.php`):**
+  - Implementado em PHP puro (sem Composer/pacotes externos).
+  - Suporte a tipografia Type1 Helvetica, cabeçalho timbrado, numeração de páginas, tabelas zebradas, alertas informativos e blocos de assinatura física do beneficiário.
+- [x] **Motor Nativo de QR Code (`app/Core/QrCode.php`):**
+  - Geração nativa de matriz e renderização vetorial SVG de QR Code para validação de autenticidade documental.
+- [x] **Modelos Oficiais Emitidos (`app/Services/PdfService.php`):**
+  - **Termo de Declaração e Recebimento de Benefício** (`/beneficios/{id}/termo-pdf`).
+  - **Prontuário Socioassistencial Completo da Família** com QR Code de validação (`/familias/{id}/prontuario-pdf`).
+  - **Recibo Oficial de Doação Socioassistencial** com discriminação de itens/valores por extenso e quitação legal (`/doacoes/{id}/recibo-pdf`).
+  - Botões de exportação integrados diretamente nas páginas de detalhes (`beneficios/show.php`, `familias/show.php`, `doacoes/show.php`).
+
+---
 
 ### 📎 B. Upload Seguro de Documentos e Laudos
-- **Situação Atual:** Os dados de documentos (número de RG, CPF, NIS) são registrados em texto estruturado.
-- **O que implementar:**
-  - Módulo de anexação de arquivos (PDF, JPG, PNG) para prontuários:
-    - Comprovantes de residência e renda.
-    - Laudos médicos e diagnósticos para comprovação de deficiência (PCD).
-    - Termos de guarda ou decisões judiciais de acolhimento.
-  - **Requisito de Segurança & LGPD:** Os arquivos devem ser salvos fora do diretório público (`storage/documentos/`), com nomes hash aleatórios (SHA-256), servidos apenas via endpoint autenticado com verificação de perfil (`/documentos/{id}/download`).
+- [x] **Módulo de Anexação (`app/Services/DocumentoService.php` e `DocumentoController.php`):**
+  - Armazenamento fora do diretório público (`storage/documentos/`) protegido com arquivo `.htaccess` (`Deny from all`).
+  - Nomenclatura dos arquivos protegida com hash criptográfico SHA-256 e extensões validadas (`pdf`, `png`, `jpg`, `jpeg`).
+  - Associação com prontuários familiares ou pessoas físicas (comprovantes de residência/renda, laudos médicos e termos de guarda).
+  - Download seguro via streaming autenticado (`/documentos/{id}/download`) com verificação rigorosa de perfil (RBAC) e registro em auditoria.
+  - Abas "Documentos & Laudos" incorporadas nas telas `familias/show.php` e `pessoas/show.php`.
+
+---
 
 ### 🔐 C. Autenticação de Dois Fatores (2FA / TOTP)
-- **Situação Atual:** Autenticação por e-mail e senha com hash bcrypt.
-- **O que implementar:**
-  - Adicionar suporte a 2FA baseado em tempo (TOTP — Google Authenticator / Microsoft Authenticator), tornando obrigatório para operadores com perfil `Admin` e `AssistenteSocial` que manipulam pareceres sigilosos e relatórios de vulnerabilidade.
+- [x] **Mecanismo RFC 6238 TOTP (`app/Core/Totp.php` e `AuthService.php`):**
+  - Suporte a aplicativos autenticadores padrão de mercado (Google Authenticator, Microsoft Authenticator, FreeOTP).
+  - Geração de segredo Base32, URL de provisionamento (`otpauth://`) e renderização em QR Code vetorial na tela de configuração.
+  - Geração e consumo de **códigos de backup de emergência** (formato `XXXX-XXXX`).
+  - Fluxo de login em duas etapas com interceptação de sessão pendente (`/login/2fa`).
+  - Tela de gerenciamento e ativação em `app/Views/usuarios/dois_fatores.php` acessível pelo menu do perfil (`/meu-perfil/2fa`).
+
+---
 
 ### 📲 D. Mensageria e Notificações aos Cidadãos
-- **Situação Atual:** Agendamentos e convocações são registrados no sistema, mas exigem contato telefônico manual.
-- **O que implementar:**
-  - Integração com provedor de mensageria (API de WhatsApp Business ou SMS) para envio de avisos automatizados:
-    - Confirmação e lembrete de atendimento social no dia anterior.
-    - Aviso de disponibilidade de cesta básica ou benefício para retirada.
-    - Convocação de participantes para início de oficinas e cursos.
+- [x] **Módulo de Notificações (`app/Services/NotificacaoService.php` e `NotificacaoController.php`):**
+  - Central de mensageria com suporte a múltiplos canais (WhatsApp e SMS).
+  - Modelos institucionais pré-formatados:
+    - *Lembrete de Atendimento Social.*
+    - *Aviso de Retirada de Cesta Básica / Benefício.*
+    - *Convocação para Oficina / Projeto Socioassistencial.*
+  - Drivers de envio configuráveis:
+    - Driver `log`: Registra a saída com carimbo de data/hora no arquivo de auditoria e banco de dados (ambiente de teste/demonstração).
+    - Driver `webhook`: Encaminha o payload JSON formatado para gateway ou provedor de mensageria externo (ex: Z-API, Twilio, Evolution API).
+  - Modais de disparo rápido integrados em `atendimentos/show.php` e `beneficios/show.php`, além da tela de histórico `/notificacoes/historico`.
+
+---
 
 ### 🛡️ E. Ferramenta de Anonimização e Descarte (LGPD Art. 18)
-- **Situação Atual:** Os relatórios já possuem mascaramento (`maskCpf`, `anonymizeName`) e a trilha de auditoria expurga dados sensíveis automaticamente.
-- **O que implementar:**
-  - Criar funcionalidade administrativa para atendimento a solicitações de titulares (Direito ao Esquecimento / Anonimização após o prazo legal de retenção do SUAS).
-  - Rotina de pseudonimização permanente de registros inativos há mais de 5 anos.
+- [x] **Módulo LGPD Administrativo (`app/Services/LgpdService.php` e `UsuarioController.php`):**
+  - Painel administrativo em `/auditoria/lgpd` restrito a usuários com perfil `Admin`.
+  - Atendimento a solicitações de titulares (Direito ao Esquecimento / Anonimização após o prazo legal de retenção do SUAS).
+  - Anonimização permanente dos dados nominais de identificação (nome, CPF, RG, contato, data de nascimento) mantendo os agregados estatísticos sem identificação pessoal.
+  - Varredura e listagem de cadastros e prontuários inativos há mais de 5 anos para tomada de decisão técnica.
+  - Registro de justificativa legal com protocolo emitido para comprovação junto à ANPD.
+
+---
 
 ### 🚀 F. Automação CI/CD no GitHub
-- **Situação Atual:** O repositório git está configurado e rastreado no GitHub.
-- **O que implementar:**
-  - Adicionar arquivo `.github/workflows/ci.yml` para rodar automaticamente a cada `push`:
-    - `php tests/check_syntax.php`
-    - `php tests/run_tests.php`
-    - `php tests/test_database_repositories.php`
+- [x] **Workflow de Integração Contínua (`.github/workflows/ci.yml`):**
+  - Disparado automaticamente em eventos de `push` e `pull_request` no branch `main`.
+  - Execução simultânea em matriz com **PHP 8.2 e PHP 8.3**.
+  - Etapas automatizadas:
+    - Verificação de sintaxe de todos os arquivos (`tests/check_syntax.php`).
+    - Execução da suíte completa de testes de regras de negócio (`tests/run_tests.php`).
+    - Validação dos contratos dos repositórios de banco de dados (`tests/test_database_repositories.php`).
+
+---
+
+## 2. Passos Operacionais para Entrada em Produção
+
+Ao implantar a aplicação em um servidor de produção ou homologação externa:
+
+1. **Configurar as Credenciais do PostgreSQL:**
+   - Execute o script automatizado:
+     ```bash
+     php scripts/setup_database.php [senha_do_postgres] [usuario] [porta] [banco]
+     ```
+   - O script criará o banco, aplicará os scripts DDL (`01_schema_ddl.sql`, `02_views_triggers.sql`, `03_seed_data.sql`) e configurará o arquivo `.env`.
+
+2. **Permissões de Diretório:**
+   - Assegure permissões de escrita para o servidor web no diretório de armazenamento seguro:
+     ```bash
+     chmod -R 750 storage/
+     ```
+
+3. **Integração de Mensageria (WhatsApp / SMS):**
+   - No arquivo `.env`, preencha as variáveis do provedor de mensageria caso deseje utilizar o driver `webhook`:
+     ```ini
+     NOTIF_DRIVER=webhook
+     NOTIF_WEBHOOK_URL=https://api.seu-provedor.com/v1/messages
+     NOTIF_WEBHOOK_TOKEN=seu_token_secreto_aqui
+     ```

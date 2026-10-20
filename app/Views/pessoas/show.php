@@ -125,3 +125,108 @@ use App\Models\Pessoa;
     </table>
   </div>
 </div>
+
+<!-- Documentos e Laudos Pessoais Anexados (LGPD Seguro) -->
+<div class="card" style="margin-top: 24px;">
+  <div class="card-header">
+    <div class="card-title">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      <span>Documentos & Anexos Pessoais (<?= count($documentos ?? []) ?>)</span>
+    </div>
+    <span style="font-size: 12px; color: var(--text-muted);">Armazenamento criptografado fora do diretório público com controle estrito de RBAC</span>
+  </div>
+  <div class="card-body">
+    <!-- Formulário de Anexação Rápida -->
+    <div style="background-color: var(--bg-subtle); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 24px;">
+      <h4 style="font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 12px; text-transform: uppercase;">+ Anexar Documento Pessoal</h4>
+      <form action="/pessoas/<?= $pessoa->id ?>/documentos" method="POST" enctype="multipart/form-data">
+        <?= \App\Core\View::render('partials/csrf', [], null) ?>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 12px;">
+          <div>
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Tipo de Documento *</label>
+            <select name="tipoDocumento" class="form-control" required style="font-size: 13px;">
+              <option value="rg_cnh">RG / CNH / Documento com Foto</option>
+              <option value="cpf">Cartão / Comprovante de CPF</option>
+              <option value="certidao">Certidão de Nascimento / Casamento</option>
+              <option value="carteira_trabalho">Carteira de Trabalho / CNIS</option>
+              <option value="laudo_medico_pcd">Laudo Médico / Atestado</option>
+              <option value="outro">Outro Documento Oficial</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Descrição / Observação</label>
+            <input type="text" name="descricao" class="form-control" placeholder="Ex: Cópia autenticada da certidão de nascimento" style="font-size: 13px;">
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Arquivo (PDF, JPG, PNG - até 10MB) *</label>
+            <input type="file" name="documento" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.webp" required style="font-size: 12px;">
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <button type="submit" class="btn btn-primary btn-sm">Salvar Anexo</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tabela de Documentos Cadastrados -->
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Tipo de Documento</th>
+            <th>Nome do Arquivo / Descrição</th>
+            <th>Tamanho</th>
+            <th>Data do Envio</th>
+            <th style="text-align: right;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (empty($documentos)): ?>
+            <tr><td colspan="5" class="empty-state">Nenhum documento anexado a esta pessoa até o momento.</td></tr>
+          <?php else: ?>
+            <?php foreach ($documentos as $doc): ?>
+              <tr>
+                <td>
+                  <?php
+                  $tipoLabels = [
+                    'rg_cnh' => ['label' => 'RG / CNH', 'class' => 'badge-info'],
+                    'cpf' => ['label' => 'CPF', 'class' => 'badge-info'],
+                    'certidao' => ['label' => 'Certidão', 'class' => 'badge-secondary'],
+                    'carteira_trabalho' => ['label' => 'CTPS / Renda', 'class' => 'badge-success'],
+                    'laudo_medico_pcd' => ['label' => 'Laudo PCD/Médico', 'class' => 'badge-warning'],
+                    'outro' => ['label' => 'Outro', 'class' => 'badge-secondary']
+                  ];
+                  $t = $tipoLabels[$doc->tipoDocumento] ?? ['label' => $doc->tipoDocumento, 'class' => 'badge-secondary'];
+                  ?>
+                  <span class="badge <?= $t['class'] ?>"><?= htmlspecialchars($t['label'], ENT_QUOTES, 'UTF-8') ?></span>
+                </td>
+                <td>
+                  <div style="font-weight: 600; color: var(--text-main); font-size: 13px;">
+                    <?= htmlspecialchars($doc->nomeOriginal, ENT_QUOTES, 'UTF-8') ?>
+                  </div>
+                  <?php if (!empty($doc->descricao)): ?>
+                    <div style="font-size: 11px; color: var(--text-muted);"><?= htmlspecialchars($doc->descricao, ENT_QUOTES, 'UTF-8') ?></div>
+                  <?php endif; ?>
+                </td>
+                <td style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
+                  <?= number_format($doc->tamanhoBytes / 1024, 1, ',', '.') ?> KB
+                </td>
+                <td style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">
+                  <?= FormatHelper::datetime($doc->dataUpload) ?>
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <a href="/documentos/<?= $doc->id ?>/download" class="btn btn-outline btn-sm" title="Download Seguro">⬇ Baixar</a>
+                  <form action="/documentos/<?= $doc->id ?>/excluir" method="POST" style="display: inline;" data-confirm="Deseja realmente excluir permanentemente este documento? Esta ação será registrada na trilha de auditoria.">
+                    <?= \App\Core\View::render('partials/csrf', [], null) ?>
+                    <input type="hidden" name="redirect" value="/pessoas/<?= $pessoa->id ?>">
+                    <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); margin-left: 4px;" title="Excluir Anexo">🗑 Excluir</button>
+                  </form>
+                </td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

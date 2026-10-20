@@ -120,8 +120,71 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
             $perfil,
             (bool)$row['ativo'],
             $row['ultimo_acesso'] ? substr((string)$row['ultimo_acesso'], 0, 19) : null,
-            $row['senha_hash'] ?? null
+            $row['senha_hash'] ?? null,
+            (bool)($row['dois_fatores_ativo'] ?? false),
+            $row['dois_fatores_secret'] ?? null,
+            json_decode((string)($row['dois_fatores_backup_codes'] ?? '[]'), true) ?: []
         );
+    }
+
+    public function setTwoFactorSecret(int $userId, string $secret, array $backupCodes): bool
+    {
+        $stmt = $this->db->prepare("
+            UPDATE gestao_social.usuarios
+               SET dois_fatores_secret = :secret,
+                   dois_fatores_backup_codes = :codes
+             WHERE id = :id
+        ");
+        return $stmt->execute([
+            'id' => $userId,
+            'secret' => $secret,
+            'codes' => json_encode($backupCodes)
+        ]);
+    }
+
+    public function enableTwoFactor(int $userId): bool
+    {
+        $stmt = $this->db->prepare("UPDATE gestao_social.usuarios SET dois_fatores_ativo = true WHERE id = :id");
+        return $stmt->execute(['id' => $userId]);
+    }
+
+    public function disableTwoFactor(int $userId): bool
+    {
+        $stmt = $this->db->prepare("
+            UPDATE gestao_social.usuarios
+               SET dois_fatores_ativo = false,
+                   dois_fatores_secret = NULL,
+                   dois_fatores_backup_codes = NULL
+             WHERE id = :id
+        ");
+        return $stmt->execute(['id' => $userId]);
+    }
+
+    public function consumeBackupCode(int $userId, string $code): bool
+    {
+        $stmt = $this->db->prepare("SELECT dois_fatores_backup_codes FROM gestao_social.usuarios WHERE id = :id");
+        $stmt->execute(['id' => $userId]);
+        $raw = $stmt->fetchColumn();
+        if (!$raw) {
+            return false;
+        }
+
+        $codes = json_decode((string)$raw, true) ?: [];
+        $cleanTarget = strtoupper(str_replace(['-', ' '], '', trim($code)));
+
+        foreach ($codes as $idx => $storedCode) {
+            $cleanStored = strtoupper(str_replace(['-', ' '], '', trim($storedCode)));
+            if ($cleanStored === $cleanTarget) {
+                unset($codes[$idx]);
+                $update = $this->db->prepare("UPDATE gestao_social.usuarios SET dois_fatores_backup_codes = :codes WHERE id = :id");
+                return $update->execute([
+                    'id' => $userId,
+                    'codes' => json_encode(array_values($codes))
+                ]);
+            }
+        }
+
+        return false;
     }
 
     private function resolvePerfilId(string $perfil): int

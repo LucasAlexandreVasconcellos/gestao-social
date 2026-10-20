@@ -48,6 +48,7 @@ final class PessoaRepositoryDemo implements PessoaRepositoryInterface
 
     public function findAll(array $filters = []): array
     {
+        $this->ensureSeedData();
         $pessoas = Session::get(self::SESSION_KEY, []);
 
         if (!empty($filters['search'])) {
@@ -64,12 +65,14 @@ final class PessoaRepositoryDemo implements PessoaRepositoryInterface
 
     public function findById(int $id): ?Pessoa
     {
+        $this->ensureSeedData();
         $pessoas = Session::get(self::SESSION_KEY, []);
         return $pessoas[$id] ?? null;
     }
 
     public function findByCpf(string $cpf): ?Pessoa
     {
+        $this->ensureSeedData();
         $clean = preg_replace('/\D/', '', $cpf);
         $pessoas = Session::get(self::SESSION_KEY, []);
         foreach ($pessoas as $pessoa) {

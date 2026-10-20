@@ -62,6 +62,7 @@ final class BeneficioRepositoryDemo implements BeneficioRepositoryInterface
 
     public function findAll(array $filters = []): array
     {
+        $this->ensureSeedData();
         $beneficios = Session::get(self::SESSION_KEY, []);
 
         if (!empty($filters['familiaId'])) {
@@ -87,12 +88,14 @@ final class BeneficioRepositoryDemo implements BeneficioRepositoryInterface
 
     public function findById(int $id): ?BeneficioEntrega
     {
+        $this->ensureSeedData();
         $beneficios = Session::get(self::SESSION_KEY, []);
         return $beneficios[$id] ?? null;
     }
 
     public function findByFamiliaId(int $familiaId): array
     {
+        $this->ensureSeedData();
         return $this->findAll(['familiaId' => $familiaId]);
     }
 

@@ -65,6 +65,7 @@ final class DoacaoRepositoryDemo implements DoacaoRepositoryInterface
 
     public function findAll(array $filters = []): array
     {
+        $this->ensureSeedData();
         $doacoes = Session::get(self::SESSION_KEY, []);
 
         if (!empty($filters['tipo'])) {
@@ -87,6 +88,7 @@ final class DoacaoRepositoryDemo implements DoacaoRepositoryInterface
 
     public function findById(int $id): ?Doacao
     {
+        $this->ensureSeedData();
         $doacoes = Session::get(self::SESSION_KEY, []);
         return $doacoes[$id] ?? null;
     }

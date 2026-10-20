@@ -36,6 +36,11 @@ final class FormatHelper
         return 'R$ ' . number_format((float)$amount, 2, ',', '.');
     }
 
+    public static function currency(float|int|null $amount): string
+    {
+        return self::money($amount);
+    }
+
     public static function cpf(?string $cpf): string
     {
         if (empty($cpf)) {

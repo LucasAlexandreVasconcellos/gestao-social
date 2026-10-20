@@ -20,7 +20,10 @@ final class Usuario
         public string $perfil,
         public bool $ativo = true,
         public ?string $ultimoAcesso = null,
-        public ?string $senhaHash = null
+        public ?string $senhaHash = null,
+        public bool $doisFatoresAtivo = false,
+        public ?string $doisFatoresSecret = null,
+        public array $doisFatoresBackupCodes = []
     ) {}
 
     public function can(string $permission): bool
@@ -61,7 +64,7 @@ final class Usuario
     public function toArray(): array
     {
         $data = get_object_vars($this);
-        unset($data['senhaHash']);
+        unset($data['senhaHash'], $data['doisFatoresSecret'], $data['doisFatoresBackupCodes']);
         return $data;
     }
 }

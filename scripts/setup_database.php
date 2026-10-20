@@ -122,7 +122,7 @@ require_once $root . '/app/Core/Autoloader.php';
 if (\App\Core\Database::isConnected()) {
     echo "\n========================================================\n";
     echo "SUCESSO! Conexão PDO ativa e validada pelo App\\Core\\Database!\n";
-    echo "Todos os 10 repositórios Db estão prontos para produção.\n";
+    echo "Todos os 12 repositórios Db estão prontos para produção.\n";
     echo "========================================================\n";
 } else {
     echo "\n[AVISO] Conexão via App\\Core\\Database retornou falso: " . \App\Core\Database::getLastError() . "\n";

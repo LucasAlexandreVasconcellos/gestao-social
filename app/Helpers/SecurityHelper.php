@@ -31,4 +31,9 @@ final class SecurityHelper
         }
         return trim(strip_tags($value));
     }
+
+    public static function maskCpf(?string $cpf): string
+    {
+        return FormatHelper::maskCpf($cpf);
+    }
 }

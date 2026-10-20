@@ -1,0 +1,2 @@
+# Proteção estrita contra acesso web direto a documentos e laudos confidenciais (LGPD)
+Deny from all
