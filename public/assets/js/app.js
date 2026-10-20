@@ -286,12 +286,103 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
-  // 6. Menu Mobile Toggle
+  // 6. Controle Interativo da Barra Lateral (Toggle Desktop & Mobile)
   const toggleBtn = document.getElementById('sidebar-toggle');
+  const closeBtn = document.getElementById('sidebar-close');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const container = document.querySelector('.app-container');
   const sidebar = document.querySelector('.app-sidebar');
-  if (toggleBtn && sidebar) {
-    toggleBtn.addEventListener('click', function () {
-      sidebar.classList.toggle('open');
+
+  if (toggleBtn && sidebar && container) {
+    const isMobile = () => window.innerWidth <= 900;
+
+    // Sincroniza estado inicial gravado no localStorage para Desktop
+    const savedClosed = localStorage.getItem('sidebar_closed');
+    if (!isMobile() && savedClosed === 'true') {
+      container.classList.add('sidebar-closed');
+      document.documentElement.classList.remove('sidebar-closed');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    } else {
+      document.documentElement.classList.remove('sidebar-closed');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    const openMobileSidebar = () => {
+      container.classList.add('sidebar-open');
+      sidebar.classList.add('open');
+      if (backdrop) backdrop.classList.add('active');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    };
+
+    const closeMobileSidebar = () => {
+      container.classList.remove('sidebar-open');
+      sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('active');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    };
+
+    const toggleDesktopSidebar = () => {
+      const isCurrentlyClosed = container.classList.contains('sidebar-closed');
+      if (isCurrentlyClosed) {
+        // Abre a sidebar
+        container.classList.remove('sidebar-closed');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        localStorage.setItem('sidebar_closed', 'false');
+      } else {
+        // Fecha a sidebar
+        container.classList.add('sidebar-closed');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        localStorage.setItem('sidebar_closed', 'true');
+      }
+    };
+
+    // Clique no botão das 3 barrinhas no topo
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (isMobile()) {
+        const isOpen = container.classList.contains('sidebar-open') || sidebar.classList.contains('open');
+        if (isOpen) {
+          closeMobileSidebar();
+        } else {
+          openMobileSidebar();
+        }
+      } else {
+        toggleDesktopSidebar();
+      }
+    });
+
+    // Botão de fechar dentro da sidebar (Mobile)
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        closeMobileSidebar();
+      });
+    }
+
+    // Clique no backdrop fecha a sidebar (Mobile)
+    if (backdrop) {
+      backdrop.addEventListener('click', function () {
+        closeMobileSidebar();
+      });
+    }
+
+    // Fechar ao pressionar a tecla Escape
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        if (isMobile() && (container.classList.contains('sidebar-open') || sidebar.classList.contains('open'))) {
+          closeMobileSidebar();
+        }
+      }
+    });
+
+    // Redimensionamento de tela: limpa estados conflitantes
+    window.addEventListener('resize', function () {
+      if (!isMobile()) {
+        closeMobileSidebar();
+      }
     });
   }
 });
+

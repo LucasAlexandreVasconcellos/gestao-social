@@ -13,19 +13,31 @@ $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'tr
   <title>Gestão Social e Assistencial</title>
   <link rel="stylesheet" href="/assets/css/app.css">
   <link rel="stylesheet" href="/assets/css/print.css" media="print">
+  <script>
+    try {
+      if (window.innerWidth > 900 && localStorage.getItem('sidebar_closed') === 'true') {
+        document.documentElement.classList.add('sidebar-closed');
+      }
+    } catch (e) {}
+  </script>
 </head>
 <body>
-  <div class="app-container">
+  <div class="app-container" id="appContainer">
     <!-- Sidebar Institucional -->
-    <aside class="app-sidebar">
+    <aside class="app-sidebar" id="appSidebar" aria-label="Menu principal">
       <div class="sidebar-brand">
-        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-          <circle cx="9" cy="7" r="4"></circle>
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-        </svg>
-        <span>Gestão Social</span>
+        <div class="sidebar-brand-title">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Gestão Social</span>
+        </div>
+        <button id="sidebar-close" class="sidebar-close-btn" aria-label="Fechar menu" title="Fechar menu lateral">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
       <nav class="sidebar-menu">
@@ -94,12 +106,15 @@ $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'tr
       </div>
     </aside>
 
+    <!-- Overlay / Backdrop para fechamento no mobile -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
     <!-- Área Principal -->
     <div class="app-main">
       <!-- Topbar Header -->
       <header class="app-header no-print">
         <div class="header-title">
-          <button id="sidebar-toggle" style="background:none;border:none;cursor:pointer;display:inline-flex;" aria-label="Menu">
+          <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Alternar barra lateral" title="Alternar barra lateral" aria-expanded="true">
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
           <h1>Sistema de Gestão Social e Assistencial</h1>
