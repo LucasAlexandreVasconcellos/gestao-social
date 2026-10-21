@@ -11,11 +11,19 @@ use PDO;
 
 final class AvaliacaoRepositoryDb implements AvaliacaoRepositoryInterface
 {
-    private PDO $db;
+    private ?PDO $dbInstance = null;
 
     public function __construct(?PDO $db = null)
     {
-        $this->db = $db ?? Database::getConnection();
+        $this->dbInstance = $db;
+    }
+
+    public function __get(string $name): mixed
+    {
+        if ($name === 'db') {
+            return $this->dbInstance ??= Database::getConnection();
+        }
+        return null;
     }
 
     public function findAll(array $filters = []): array

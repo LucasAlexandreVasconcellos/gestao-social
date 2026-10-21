@@ -18,10 +18,7 @@ final class AuthController
 
     public function login(Request $request): string
     {
-        $usuarios = $this->authService->getAllUsers();
-
         return View::render('auth/login', [
-            'usuarios' => $usuarios,
             'error' => Session::flash('error')
         ], 'layouts/auth');
     }
@@ -32,23 +29,15 @@ final class AuthController
         $password = (string)$request->post('password', '');
 
         if (empty($email)) {
-            Session::flash('error', 'Por favor informe o e-mail de acesso.');
+            Session::flash('error', 'Por favor informe o e-mail ou usuário de acesso.');
             Response::redirect('/login');
             return;
         }
 
-        // Se o login foi acionado via botão de acesso rápido por perfil (sem campo de senha)
-        if ($password === '') {
-            $success = $this->authService->loginDemo($email);
-            if ($success) {
-                if ($this->authService->hasPending2fa()) {
-                    Response::redirect('/login/2fa');
-                    return;
-                }
-                Session::flash('success', 'Bem-vindo à Plataforma de Gestão Social e Assistencial!');
-                Response::redirect('/dashboard');
-                return;
-            }
+        if (empty($password)) {
+            Session::flash('error', 'Por favor informe a senha de acesso.');
+            Response::redirect('/login');
+            return;
         }
 
         $success = $this->authService->login($email, $password);

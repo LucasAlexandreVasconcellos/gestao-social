@@ -22,11 +22,11 @@ return [
     'connections' => [
         'pgsql' => [
             'driver' => 'pgsql',
-            'host' => class_exists(Env::class) ? Env::get('DB_HOST', '127.0.0.1') : (getenv('DB_HOST') ?: '127.0.0.1'),
+            'host' => class_exists(Env::class) ? Env::get('DB_HOST', '10.223.152.5') : (getenv('DB_HOST') ?: '10.223.152.5'),
             'port' => (int)(class_exists(Env::class) ? Env::get('DB_PORT', 5432) : (getenv('DB_PORT') ?: 5432)),
-            'database' => class_exists(Env::class) ? Env::get('DB_DATABASE', 'gestao_social') : (getenv('DB_DATABASE') ?: 'gestao_social'),
+            'database' => class_exists(Env::class) ? Env::get('DB_DATABASE', 'obras') : (getenv('DB_DATABASE') ?: 'obras'),
             'username' => class_exists(Env::class) ? Env::get('DB_USERNAME', 'postgres') : (getenv('DB_USERNAME') ?: 'postgres'),
-            'password' => class_exists(Env::class) ? Env::get('DB_PASSWORD', '') : (getenv('DB_PASSWORD') ?: ''),
+            'password' => class_exists(Env::class) ? Env::get('DB_PASSWORD', 'Sodf@1234') : (getenv('DB_PASSWORD') ?: 'Sodf@1234'),
             'schema' => class_exists(Env::class) ? Env::get('DB_SCHEMA', 'gestao_social') : (getenv('DB_SCHEMA') ?: 'gestao_social'),
             'charset' => 'utf8',
             'timeout' => 5,

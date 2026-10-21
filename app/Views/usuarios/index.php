@@ -9,11 +9,11 @@
     <div style="display: flex; gap: var(--spacing-md); align-items: flex-start;">
         <span style="font-size: 1.5rem;">🛡️</span>
         <div>
-            <h4 style="margin: 0 0 0.25rem 0; font-size: 0.95rem;">Controle de Acesso em Nível de Servidor e Preparação para o Banco de Dados</h4>
+            <h4 style="margin: 0 0 0.25rem 0; font-size: 0.95rem;">Controle de Acesso em Nível de Servidor e Persistência Oficial no PostgreSQL</h4>
             <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
                 As permissões são validadas estritamente no back-end (via métodos <code>Usuario::can()</code> e <code>RoleMiddleware</code>), impedindo requisições não autorizadas mesmo que interfaces sejam forçadas.
                 <br>
-                <strong>Integração Futura:</strong> O responsável pelo banco de dados implementará a persistência real na tabela <code>usuarios</code>, utilizando <code>password_hash()</code> e <code>password_verify()</code> com salt seguro. Os usuários abaixo são demonstrativos e servem para testes completos dos fluxos.
+                <strong>Persistência Oficial:</strong> Os usuários e perfis institucionais são gerenciados diretamente no banco de dados <code>obras</code> (schema <code>gestao_social</code>), com senhas criptografadas e proteção 2FA.
             </p>
         </div>
     </div>
@@ -54,7 +54,7 @@
                             <td>
                                 <span class="badge badge-success">Ativo</span>
                             </td>
-                            <td><?= $u->ultimoAcesso ? \App\Helpers\FormatHelper::datetime($u->ultimoAcesso) : 'Demonstração' ?></td>
+                            <td><?= $u->ultimoAcesso ? \App\Helpers\FormatHelper::datetime($u->ultimoAcesso) : 'Nunca acessou' ?></td>
                             <td style="text-align: right;">
                                 <?php if (!$currentUser || $currentUser->id !== $u->id): ?>
                                     <form method="POST" action="/usuarios/alternar-perfil" style="display: inline;">

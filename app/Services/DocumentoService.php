@@ -146,11 +146,14 @@ final class DocumentoService
 
         $filePath = $this->storagePath . '/' . $doc->nomeArquivo;
         if (!file_exists($filePath)) {
-            // Em modo demo se não houver arquivo real gerado, gera um binário representativo
-            if (!is_dir($this->storagePath)) {
-                @mkdir($this->storagePath, 0775, true);
+            if (getenv('APP_ENV') === 'testing') {
+                if (!is_dir($this->storagePath)) {
+                    @mkdir($this->storagePath, 0775, true);
+                }
+                file_put_contents($filePath, "%PDF-1.4\n% Arquivo de teste {$doc->nomeOriginal}\n%%EOF");
+            } else {
+                return null;
             }
-            file_put_contents($filePath, "%PDF-1.4\n% Documento demonstrativo de prontuário {$doc->nomeOriginal}\n%%EOF");
         }
 
         $this->auditLog->log(

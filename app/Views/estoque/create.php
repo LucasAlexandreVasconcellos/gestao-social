@@ -50,7 +50,7 @@
         </div>
 
         <div class="form-group col-3">
-          <label class="form-label" for="estoqueAtual">Estoque Inicial (Demonstrativo)</label>
+          <label class="form-label" for="estoqueAtual">Estoque Inicial</label>
           <input type="number" step="0.5" id="estoqueAtual" name="estoqueAtual" class="form-control" value="<?= htmlspecialchars((string)($old['estoqueAtual'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>">
         </div>
 

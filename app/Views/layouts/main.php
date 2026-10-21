@@ -3,7 +3,6 @@
 /** @var array|null $user */
 $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
 $isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' : '';
-$isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'true');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -133,24 +132,6 @@ $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'tr
         </div>
 
         <div class="header-actions">
-          <?php if ($isDemo): ?>
-          <!-- Alternador Rápido de Perfis Demonstrativos (Habilitado apenas no modo Demo) -->
-          <form action="/usuarios/alternar-perfil" method="POST" style="margin: 0;">
-            <?= \App\Core\View::render('partials/csrf', [], null) ?>
-            <div class="role-switcher" title="Alterne entre os perfis demonstrativos para inspecionar permissões RBAC">
-              <label for="role-select" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Perfil Demo:</label>
-              <select id="role-select" name="userId" onchange="this.form.submit()">
-                <option value="1" <?= ($user['id'] ?? 1) === 1 ? 'selected' : '' ?>>Administrador</option>
-                <option value="2" <?= ($user['id'] ?? 1) === 2 ? 'selected' : '' ?>>Coordenação</option>
-                <option value="3" <?= ($user['id'] ?? 1) === 3 ? 'selected' : '' ?>>Assistente Social</option>
-                <option value="4" <?= ($user['id'] ?? 1) === 4 ? 'selected' : '' ?>>Estoque</option>
-                <option value="5" <?= ($user['id'] ?? 1) === 5 ? 'selected' : '' ?>>Atendimento</option>
-                <option value="6" <?= ($user['id'] ?? 1) === 6 ? 'selected' : '' ?>>Consulta</option>
-              </select>
-            </div>
-          </form>
-          <?php endif; ?>
-
           <div style="font-size: 13px; text-align: right;">
             <div style="font-weight: 600; color: var(--text-main);"><?= htmlspecialchars($user['nome'] ?? 'Usuário', ENT_QUOTES, 'UTF-8') ?></div>
             <div style="font-size: 11px; color: var(--text-muted);"><?= htmlspecialchars($user['perfil'] ?? 'Perfil', ENT_QUOTES, 'UTF-8') ?></div>
@@ -159,19 +140,6 @@ $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'tr
           <a href="/logout" class="btn btn-secondary btn-sm" title="Sair do sistema">Sair</a>
         </div>
       </header>
-
-      <?php if ($isDemo): ?>
-      <!-- Banner Demonstrativo -->
-      <div class="demo-banner no-print">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="demo-badge">Modo Demonstração</span>
-          <span><strong>Aviso de Arquitetura:</strong> A aplicação está executando com repositórios em memória. O banco de dados físico será conectado futuramente pelo responsável conforme o contrato em <code>docs/DatabaseIntegration.md</code>.</span>
-        </div>
-        <div style="white-space: nowrap;">
-          <a href="/auditoria" style="color: inherit; text-decoration: underline; font-weight: 600;">Ver Auditoria</a>
-        </div>
-      </div>
-      <?php endif; ?>
 
       <!-- Área de Conteúdo -->
       <main class="app-content">

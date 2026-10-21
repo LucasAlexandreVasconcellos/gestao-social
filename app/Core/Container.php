@@ -60,7 +60,11 @@ final class Container
             if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
                 $dependencyClassName = $type->getName();
                 if ($dependencyClassName === \PDO::class) {
-                    $dependencies[] = Database::getConnection();
+                    if ($param->allowsNull() || $param->isDefaultValueAvailable()) {
+                        $dependencies[] = null;
+                    } else {
+                        $dependencies[] = Database::getConnection();
+                    }
                 } elseif (isset(self::$bindings[$dependencyClassName])) {
                     $dependencies[] = self::resolve($dependencyClassName);
                 } elseif ($param->isDefaultValueAvailable()) {

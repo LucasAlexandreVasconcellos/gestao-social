@@ -59,11 +59,10 @@ final class UsuarioController
     public function switchRole(Request $request): void
     {
         $currentUser = $this->authService->getCurrentUser();
-        $isDemo = !\App\Core\Database::isConnected() || (getenv('APP_DEMO_MODE') === 'true');
 
-        // Em ambiente de produção real (banco conectado), alternar perfil exige perfil de Administrador
-        if (!$isDemo && (!$currentUser || $currentUser->perfil !== \App\Models\Usuario::PERFIL_ADMIN)) {
-            Session::flash('error', 'Acesso negado: A alternância rápida de perfis está restrita ao Administrador no ambiente com banco de dados.');
+        // Em ambiente oficial, a simulação/alternância de perfil é estritamente restrita a Administradores
+        if (!$currentUser || $currentUser->perfil !== \App\Models\Usuario::PERFIL_ADMIN) {
+            Session::flash('error', 'Acesso negado: A alternância de perfil é uma função restrita ao Administrador Geral.');
             Response::redirect('/dashboard');
             return;
         }

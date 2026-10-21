@@ -22,6 +22,7 @@ require_once ROOT_PATH . '/app/Core/polyfills.php';
 \App\Core\Autoloader::addNamespace('App', ROOT_PATH . '/app');
 
 // Garante isolamento estrito para a suíte de testes unitários de regras de negócio
+putenv('APP_ENV=testing');
 putenv('APP_DEMO_MODE=true');
 
 // Carrega injeção de dependências

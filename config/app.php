@@ -28,29 +28,15 @@ use App\Repositories\Database\NotificacaoRepositoryDb;
 use App\Repositories\Database\PessoaRepositoryDb;
 use App\Repositories\Database\ProjetoRepositoryDb;
 use App\Repositories\Database\UsuarioRepositoryDb;
-use App\Repositories\Demo\AtendimentoRepositoryDemo;
-use App\Repositories\Demo\AuditoriaRepositoryDemo;
-use App\Repositories\Demo\AvaliacaoRepositoryDemo;
-use App\Repositories\Demo\BeneficioRepositoryDemo;
-use App\Repositories\Demo\DoacaoRepositoryDemo;
-use App\Repositories\Demo\DocumentoRepositoryDemo;
-use App\Repositories\Demo\EstoqueRepositoryDemo;
-use App\Repositories\Demo\FamiliaRepositoryDemo;
-use App\Repositories\Demo\NotificacaoRepositoryDemo;
-use App\Repositories\Demo\PessoaRepositoryDemo;
-use App\Repositories\Demo\ProjetoRepositoryDemo;
-use App\Repositories\Demo\UsuarioRepositoryDemo;
 
 // Fuso horário institucional
 date_default_timezone_set('America/Sao_Paulo');
 
-// Detecção de Modo de Operação (Banco de Dados PostgreSQL vs Demonstração em Memória)
-// Se APP_DEMO_MODE não estiver forçado para 'true' e o banco PostgreSQL estiver conectado,
-// ativa os repositórios reais com persistência em banco de dados!
-$forceDemo = (getenv('APP_DEMO_MODE') === 'true');
-$useDatabase = !$forceDemo && (getenv('DB_CONNECTION') === 'pgsql' || Database::isConnected());
+// Injeção Oficial de Dependências — Versão Final com Banco de Dados PostgreSQL
+// Todos os repositórios operam com persistência real no PostgreSQL (schema: gestao_social)
+$isTesting = (getenv('APP_ENV') === 'testing');
 
-if ($useDatabase) {
+if (!$isTesting) {
     Container::singleton(\PDO::class, fn() => Database::getConnection());
     Container::singleton(FamiliaRepositoryInterface::class, FamiliaRepositoryDb::class);
     Container::singleton(PessoaRepositoryInterface::class, PessoaRepositoryDb::class);
@@ -65,25 +51,26 @@ if ($useDatabase) {
     Container::singleton(DocumentoRepositoryInterface::class, DocumentoRepositoryDb::class);
     Container::singleton(NotificacaoRepositoryInterface::class, NotificacaoRepositoryDb::class);
 } else {
-    Container::singleton(FamiliaRepositoryInterface::class, FamiliaRepositoryDemo::class);
-    Container::singleton(PessoaRepositoryInterface::class, PessoaRepositoryDemo::class);
-    Container::singleton(AvaliacaoRepositoryInterface::class, AvaliacaoRepositoryDemo::class);
-    Container::singleton(AtendimentoRepositoryInterface::class, AtendimentoRepositoryDemo::class);
-    Container::singleton(BeneficioRepositoryInterface::class, BeneficioRepositoryDemo::class);
-    Container::singleton(EstoqueRepositoryInterface::class, EstoqueRepositoryDemo::class);
-    Container::singleton(DoacaoRepositoryInterface::class, DoacaoRepositoryDemo::class);
-    Container::singleton(ProjetoRepositoryInterface::class, ProjetoRepositoryDemo::class);
-    Container::singleton(UsuarioRepositoryInterface::class, UsuarioRepositoryDemo::class);
-    Container::singleton(AuditoriaRepositoryInterface::class, AuditoriaRepositoryDemo::class);
-    Container::singleton(DocumentoRepositoryInterface::class, DocumentoRepositoryDemo::class);
-    Container::singleton(NotificacaoRepositoryInterface::class, NotificacaoRepositoryDemo::class);
+    // Ambiente isolado de testes unitários automatizados (apenas quando acionado via CLI)
+    Container::singleton(FamiliaRepositoryInterface::class, \App\Repositories\Demo\FamiliaRepositoryDemo::class);
+    Container::singleton(PessoaRepositoryInterface::class, \App\Repositories\Demo\PessoaRepositoryDemo::class);
+    Container::singleton(AvaliacaoRepositoryInterface::class, \App\Repositories\Demo\AvaliacaoRepositoryDemo::class);
+    Container::singleton(AtendimentoRepositoryInterface::class, \App\Repositories\Demo\AtendimentoRepositoryDemo::class);
+    Container::singleton(BeneficioRepositoryInterface::class, \App\Repositories\Demo\BeneficioRepositoryDemo::class);
+    Container::singleton(EstoqueRepositoryInterface::class, \App\Repositories\Demo\EstoqueRepositoryDemo::class);
+    Container::singleton(DoacaoRepositoryInterface::class, \App\Repositories\Demo\DoacaoRepositoryDemo::class);
+    Container::singleton(ProjetoRepositoryInterface::class, \App\Repositories\Demo\ProjetoRepositoryDemo::class);
+    Container::singleton(UsuarioRepositoryInterface::class, \App\Repositories\Demo\UsuarioRepositoryDemo::class);
+    Container::singleton(AuditoriaRepositoryInterface::class, \App\Repositories\Demo\AuditoriaRepositoryDemo::class);
+    Container::singleton(DocumentoRepositoryInterface::class, \App\Repositories\Demo\DocumentoRepositoryDemo::class);
+    Container::singleton(NotificacaoRepositoryInterface::class, \App\Repositories\Demo\NotificacaoRepositoryDemo::class);
 }
 
 return [
     'name' => 'Sistema de Gestão Social e Assistencial',
     'version' => '1.0.0',
-    'env' => getenv('APP_ENV') ?: 'local',
-    'demo_mode' => !$useDatabase,
-    'db_driver' => $useDatabase ? 'pgsql' : 'memory',
+    'env' => getenv('APP_ENV') ?: 'production',
+    'demo_mode' => false,
+    'db_driver' => 'pgsql',
     'charset' => 'UTF-8'
 ];

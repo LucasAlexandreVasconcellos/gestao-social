@@ -171,11 +171,11 @@ final class Database
 
         return [
             'driver' => getenv('DB_CONNECTION') ?: 'pgsql',
-            'host' => getenv('DB_HOST') ?: '127.0.0.1',
+            'host' => getenv('DB_HOST') ?: '10.223.152.5',
             'port' => (int)(getenv('DB_PORT') ?: 5432),
-            'database' => getenv('DB_DATABASE') ?: 'gestao_social',
+            'database' => getenv('DB_DATABASE') ?: 'obras',
             'username' => getenv('DB_USERNAME') ?: 'postgres',
-            'password' => getenv('DB_PASSWORD') ?: '',
+            'password' => getenv('DB_PASSWORD') ?: 'Sodf@1234',
             'schema' => getenv('DB_SCHEMA') ?: 'gestao_social',
             'charset' => 'utf8',
             'timeout' => 5,
