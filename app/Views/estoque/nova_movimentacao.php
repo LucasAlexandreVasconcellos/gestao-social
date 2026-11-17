@@ -38,7 +38,8 @@ use App\Models\Produto;
           <select id="tipo" name="tipo" class="form-select" required>
             <option value="Entrada">Entrada (Doação recebida / Compra)</option>
             <option value="Saída">Saída (Distribuição / Consumo)</option>
-            <option value="Ajuste">Ajuste de Balanço (Acerto de Saldo)</option>
+            <option value="Ajuste Positivo">Ajuste Positivo (Acréscimo de Inventário)</option>
+            <option value="Ajuste Negativo">Ajuste Negativo (Redução de Inventário)</option>
             <option value="Perda">Perda (Vencido / Avariado / Descarte)</option>
           </select>
         </div>
@@ -68,7 +69,7 @@ use App\Models\Produto;
 
         <div class="form-group col-3">
           <label class="form-label" for="responsavel">Responsável pelo Lançamento <span class="required">*</span></label>
-          <input type="text" id="responsavel" name="responsavel" class="form-control" required value="<?= htmlspecialchars($old['responsavel'] ?? 'Robson Almoxarife', ENT_QUOTES, 'UTF-8') ?>">
+          <input type="text" id="responsavel" name="responsavel" class="form-control" required placeholder="Nome do operador" value="<?= htmlspecialchars($old['responsavel'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
         </div>
 
         <div class="form-group col-6">

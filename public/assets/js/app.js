@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const sidebar = document.querySelector('.app-sidebar');
 
   if (toggleBtn && sidebar && container) {
-    const isMobile = () => window.innerWidth <= 900;
+    const isMobile = () => window.innerWidth <= 960;
 
     // Sincroniza estado inicial gravado no localStorage para Desktop
     const savedClosed = localStorage.getItem('sidebar_closed');

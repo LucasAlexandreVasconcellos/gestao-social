@@ -44,8 +44,12 @@ CREATE TABLE IF NOT EXISTS gestao_social.usuarios (
 );
 
 ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_ativo BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_secret VARCHAR(64) NULL;
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_secret VARCHAR(255) NULL;
 ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS dois_fatores_backup_codes TEXT NULL;
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS trocar_senha_obrigatorio BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS tentativas_login INT NOT NULL DEFAULT 0;
+ALTER TABLE gestao_social.usuarios ADD COLUMN IF NOT EXISTS bloqueado_ate TIMESTAMP WITH TIME ZONE NULL;
+ALTER TABLE gestao_social.usuarios ALTER COLUMN dois_fatores_secret TYPE VARCHAR(255);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_usuarios_email_lower ON gestao_social.usuarios (LOWER(email));
 
@@ -55,7 +59,7 @@ CREATE TABLE IF NOT EXISTS gestao_social.auditoria (
     usuario_id BIGINT,
     usuario_identificador VARCHAR(150) NOT NULL DEFAULT CURRENT_USER,
     data_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    operacao VARCHAR(20) NOT NULL, -- INSERT, UPDATE, DELETE
+    operacao VARCHAR(80) NOT NULL, -- INSERT, UPDATE, DELETE ou eventos de serviço (LGPD, Login, Exportação)
     tabela_afetada VARCHAR(100) NOT NULL,
     registro_id BIGINT,
     dados_anteriores JSONB,
@@ -64,6 +68,7 @@ CREATE TABLE IF NOT EXISTS gestao_social.auditoria (
     CONSTRAINT fk_auditoria_usuario FOREIGN KEY (usuario_id) 
         REFERENCES gestao_social.usuarios(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
+ALTER TABLE gestao_social.auditoria ALTER COLUMN operacao TYPE VARCHAR(80);
 
 -- Restrição de Acesso aos Registros de Auditoria (LGPD): leitura e escrita direta restritas ao DBA
 -- A gravação ocorre exclusivamente via triggers executados por funções SECURITY DEFINER
@@ -121,7 +126,8 @@ BEGIN
     IF v_usuario_id IS NULL AND v_usuario_app IS NOT NULL THEN
         SELECT id INTO v_usuario_id 
           FROM gestao_social.usuarios 
-         WHERE login = v_usuario_app LIMIT 1;
+         WHERE LOWER(login) = LOWER(v_usuario_app) OR LOWER(email) = LOWER(v_usuario_app)
+         LIMIT 1;
     END IF;
 
     IF TG_OP = 'DELETE' THEN
@@ -138,9 +144,13 @@ BEGIN
 
     -- Sanitização e Minimização de dados sensíveis (LGPD)
     IF TG_TABLE_NAME = 'usuarios' THEN
-        -- Expurgar credenciais e hashes de senha
-        IF v_antigo IS NOT NULL THEN v_antigo := v_antigo - 'senha_hash'; END IF;
-        IF v_novo IS NOT NULL THEN v_novo := v_novo - 'senha_hash'; END IF;
+        -- Expurgar credenciais, hashes de senha e segredos 2FA
+        IF v_antigo IS NOT NULL THEN
+            v_antigo := v_antigo - 'senha_hash' - 'dois_fatores_secret' - 'dois_fatores_backup_codes';
+        END IF;
+        IF v_novo IS NOT NULL THEN
+            v_novo := v_novo - 'senha_hash' - 'dois_fatores_secret' - 'dois_fatores_backup_codes';
+        END IF;
 
     ELSIF TG_TABLE_NAME = 'pessoas' THEN
         -- Expurgar CPF, telefone, dados de saúde sensíveis e observações
@@ -307,6 +317,8 @@ CREATE TABLE IF NOT EXISTS gestao_social.familias (
     despesas_mensais NUMERIC(12,2) NOT NULL DEFAULT 0.00,
     situacao_moradia VARCHAR(30) NOT NULL DEFAULT 'Própria',
     status VARCHAR(20) NOT NULL DEFAULT 'Em análise',
+    observacoes TEXT,
+    historico_alteracoes JSONB NOT NULL DEFAULT '[]'::jsonb,
     data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_familias_valores CHECK ((renda_familiar IS NULL OR renda_familiar >= 0) AND despesas_mensais >= 0),
@@ -314,6 +326,9 @@ CREATE TABLE IF NOT EXISTS gestao_social.familias (
     CONSTRAINT chk_familias_status CHECK (status IN ('Em análise', 'Ativa', 'Suspensa', 'Encerrada')),
     CONSTRAINT chk_familias_moradia CHECK (situacao_moradia IN ('Própria', 'Alugada', 'Cedida', 'Ocupação', 'Precária', 'Situação de rua', 'Outra'))
 );
+
+ALTER TABLE gestao_social.familias ADD COLUMN IF NOT EXISTS observacoes TEXT;
+ALTER TABLE gestao_social.familias ADD COLUMN IF NOT EXISTS historico_alteracoes JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS gestao_social.pessoas (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -434,7 +449,12 @@ CREATE TABLE IF NOT EXISTS gestao_social.avaliacoes_sociais (
     necessita_acompanhamento BOOLEAN NOT NULL DEFAULT TRUE,
     pontuacao INT, -- Pontuação calculada ou ponderada (NULL se omitida; não assume 0 artificial)
     classificacao VARCHAR(20) NOT NULL DEFAULT 'Média',
+    justificativa_classificacao TEXT,
     parecer_social TEXT,
+    tem_criancas BOOLEAN NOT NULL DEFAULT FALSE,
+    tem_idosos BOOLEAN NOT NULL DEFAULT FALSE,
+    tem_pcd BOOLEAN NOT NULL DEFAULT FALSE,
+    necessidades_prioritarias JSONB NOT NULL DEFAULT '[]'::jsonb,
     data_reavaliacao DATE,
     data_criacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_avaliacao_familia FOREIGN KEY (familia_id) 
@@ -445,6 +465,12 @@ CREATE TABLE IF NOT EXISTS gestao_social.avaliacoes_sociais (
     CONSTRAINT chk_avaliacao_reavaliacao CHECK (data_reavaliacao IS NULL OR data_reavaliacao >= data_avaliacao::date),
     CONSTRAINT chk_avaliacao_valores CHECK ((renda_familiar_declarada IS NULL OR renda_familiar_declarada >= 0) AND (renda_per_capita IS NULL OR renda_per_capita >= 0) AND quantidade_integrantes > 0 AND (pontuacao IS NULL OR pontuacao >= 0))
 );
+
+ALTER TABLE gestao_social.avaliacoes_sociais ADD COLUMN IF NOT EXISTS justificativa_classificacao TEXT;
+ALTER TABLE gestao_social.avaliacoes_sociais ADD COLUMN IF NOT EXISTS tem_criancas BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE gestao_social.avaliacoes_sociais ADD COLUMN IF NOT EXISTS tem_idosos BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE gestao_social.avaliacoes_sociais ADD COLUMN IF NOT EXISTS tem_pcd BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE gestao_social.avaliacoes_sociais ADD COLUMN IF NOT EXISTS necessidades_prioritarias JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS gestao_social.tipos_carencia (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -636,28 +662,30 @@ BEGIN
         END IF;
     END IF;
 
-    SELECT status INTO v_status_familia 
-      FROM gestao_social.familias 
-     WHERE id = NEW.familia_id;
+    IF NEW.familia_id IS NOT NULL THEN
+        SELECT status INTO v_status_familia 
+          FROM gestao_social.familias 
+         WHERE id = NEW.familia_id;
 
-    -- Acolhida/Entrevista inicial permite famílias 'Em análise' ou 'Ativa'
-    IF TG_TABLE_NAME = 'atendimentos' THEN
-        IF NEW.tipo_atendimento = 'Acolhida/Entrevista' THEN
-            IF v_status_familia NOT IN ('Ativa', 'Em análise') THEN
-                RAISE EXCEPTION 'Operação bloqueada: A família (ID %) possui status "%" e não pode receber acolhida.', 
-                    NEW.familia_id, v_status_familia;
+        -- Acolhida/Entrevista inicial permite famílias 'Em análise' ou 'Ativa'
+        IF TG_TABLE_NAME = 'atendimentos' THEN
+            IF NEW.tipo_atendimento = 'Acolhida/Entrevista' THEN
+                IF v_status_familia NOT IN ('Ativa', 'Em análise') THEN
+                    RAISE EXCEPTION 'Operação bloqueada: A família (ID %) possui status "%" e não pode receber acolhida.', 
+                        NEW.familia_id, v_status_familia;
+                END IF;
+            ELSE
+                IF v_status_familia <> 'Ativa' THEN
+                    RAISE EXCEPTION 'Operação bloqueada: A família (ID %) não está com o status "Ativa" (Status atual: "%").', 
+                        NEW.familia_id, v_status_familia;
+                END IF;
             END IF;
         ELSE
+            -- Em acao_beneficiarios, quando vinculada a uma família, a família deve estar Ativa
             IF v_status_familia <> 'Ativa' THEN
                 RAISE EXCEPTION 'Operação bloqueada: A família (ID %) não está com o status "Ativa" (Status atual: "%").', 
                     NEW.familia_id, v_status_familia;
             END IF;
-        END IF;
-    ELSE
-        -- Em acao_beneficiarios, a família deve estar Ativa
-        IF v_status_familia <> 'Ativa' THEN
-            RAISE EXCEPTION 'Operação bloqueada: A família (ID %) não está com o status "Ativa" (Status atual: "%").', 
-                NEW.familia_id, v_status_familia;
         END IF;
     END IF;
 
@@ -875,8 +903,9 @@ CREATE TABLE IF NOT EXISTS gestao_social.acoes_sociais (
 CREATE TABLE IF NOT EXISTS gestao_social.acao_beneficiarios (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     acao_id BIGINT NOT NULL,
-    familia_id BIGINT NOT NULL,
+    familia_id BIGINT NULL,
     pessoa_id BIGINT,
+    nome_participante VARCHAR(150),
     data_participacao TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     situacao VARCHAR(30) NOT NULL DEFAULT 'Inscrito',
     observacoes TEXT,
@@ -889,6 +918,9 @@ CREATE TABLE IF NOT EXISTS gestao_social.acao_beneficiarios (
     CONSTRAINT chk_beneficiario_situacao CHECK (situacao IN ('Inscrito', 'Convocado', 'Atendido', 'Ausente'))
 );
 
+ALTER TABLE gestao_social.acao_beneficiarios ALTER COLUMN familia_id DROP NOT NULL;
+ALTER TABLE gestao_social.acao_beneficiarios ADD COLUMN IF NOT EXISTS nome_participante VARCHAR(150);
+
 -- Regras de Unicidade de Inscrição em Ações Sociais:
 -- 1. Permite múltiplos integrantes da mesma família na mesma ação, mas impede duplicidade do mesmo indivíduo:
 CREATE UNIQUE INDEX IF NOT EXISTS uq_acao_beneficiario_pessoa 
@@ -896,9 +928,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_acao_beneficiario_pessoa
     WHERE pessoa_id IS NOT NULL;
 
 -- 2. Quando a inscrição for puramente familiar (sem membro individual), impede duplicidade da família:
+DROP INDEX IF EXISTS gestao_social.uq_acao_beneficiario_familia;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_acao_beneficiario_familia 
     ON gestao_social.acao_beneficiarios (acao_id, familia_id) 
-    WHERE pessoa_id IS NULL;
+    WHERE pessoa_id IS NULL AND familia_id IS NOT NULL;
 
 DROP TRIGGER IF EXISTS tg_beneficiarios_valida_pessoa ON gestao_social.acao_beneficiarios;
 CREATE TRIGGER tg_beneficiarios_valida_pessoa

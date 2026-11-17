@@ -215,11 +215,11 @@ use App\Models\Pessoa;
                   <?= FormatHelper::datetime($doc->dataUpload) ?>
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
-                  <a href="/documentos/<?= $doc->id ?>/download" class="btn btn-outline btn-sm" title="Download Seguro">⬇ Baixar</a>
+                  <a href="/documentos/<?= $doc->id ?>/download" class="btn btn-outline btn-sm" title="Download Seguro">Baixar</a>
                   <form action="/documentos/<?= $doc->id ?>/excluir" method="POST" style="display: inline;" data-confirm="Deseja realmente excluir permanentemente este documento? Esta ação será registrada na trilha de auditoria.">
                     <?= \App\Core\View::render('partials/csrf', [], null) ?>
                     <input type="hidden" name="redirect" value="/pessoas/<?= $pessoa->id ?>">
-                    <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); margin-left: 4px;" title="Excluir Anexo">🗑 Excluir</button>
+                    <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); margin-left: 4px;" title="Excluir Anexo">Excluir</button>
                   </form>
                 </td>
               </tr>

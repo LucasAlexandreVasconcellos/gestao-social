@@ -9,6 +9,7 @@
   .btn,
   .filter-bar,
   .tabs-nav,
+  .pagination-bar,
   .no-print {
     display: none !important;
   }

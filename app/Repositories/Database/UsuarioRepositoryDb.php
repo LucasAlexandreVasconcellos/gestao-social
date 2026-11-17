@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\UsuarioRepositoryInterface;
 use App\Core\Database;
+use App\Helpers\SecurityHelper;
 use App\Models\Usuario;
 use PDO;
 
@@ -59,9 +60,11 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
             SELECT u.*, p.nome AS perfil_nome
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE LOWER(u.email) = LOWER(:email) OR LOWER(u.login) = LOWER(:email)
+             WHERE LOWER(u.email) = LOWER(:email) OR LOWER(u.login) = LOWER(:login)
+             LIMIT 1
         ");
-        $stmt->execute(['email' => trim($email)]);
+        $clean = trim($email);
+        $stmt->execute(['email' => $clean, 'login' => $clean]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row ? $this->mapRowToModel($row) : null;
@@ -69,28 +72,33 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
 
     public function save(Usuario $usuario): Usuario
     {
+        if (empty($usuario->senhaHash)) {
+            throw new \InvalidArgumentException('Hash de senha obrigatório para criação de usuário.');
+        }
+
         $perfilId = $this->resolvePerfilId($usuario->perfil);
-        $login = $this->generateLogin($usuario->email);
-        $defaultHash = password_hash('demo123', PASSWORD_BCRYPT);
+        $login = !empty($usuario->login) ? strtolower(trim($usuario->login)) : $this->generateLogin($usuario->email);
 
         $sql = "INSERT INTO gestao_social.usuarios (
-                    nome, email, login, senha_hash, perfil_id, ativo, ultimo_acesso
+                    nome, email, login, senha_hash, perfil_id, ativo, trocar_senha_obrigatorio, ultimo_acesso
                 ) VALUES (
-                    :nome, :email, :login, :senha, :perfil_id, :ativo, :acesso
+                    :nome, :email, :login, :senha, :perfil_id, :ativo, :trocar_senha, :acesso
                 ) RETURNING id";
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             'nome' => $usuario->nome,
-            'email' => strtolower($usuario->email),
+            'email' => strtolower(trim($usuario->email)),
             'login' => $login,
-            'senha' => $defaultHash,
+            'senha' => $usuario->senhaHash,
             'perfil_id' => $perfilId,
             'ativo' => $usuario->ativo ? 'true' : 'false',
+            'trocar_senha' => $usuario->trocarSenhaObrigatorio ? 'true' : 'false',
             'acesso' => $usuario->ultimoAcesso ?: null,
         ]);
 
         $usuario->id = (int)$stmt->fetchColumn();
+        $usuario->login = $login;
         return $usuario;
     }
 
@@ -103,23 +111,90 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
                     email = :email,
                     perfil_id = :perfil_id,
                     ativo = :ativo,
-                    ultimo_acesso = :acesso
+                    trocar_senha_obrigatorio = :trocar_senha
                 WHERE id = :id";
 
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([
             'id' => $usuario->id,
             'nome' => $usuario->nome,
-            'email' => strtolower($usuario->email),
+            'email' => strtolower(trim($usuario->email)),
             'perfil_id' => $perfilId,
             'ativo' => $usuario->ativo ? 'true' : 'false',
-            'acesso' => $usuario->ultimoAcesso ?: null,
+            'trocar_senha' => $usuario->trocarSenhaObrigatorio ? 'true' : 'false',
         ]);
+    }
+
+    public function updatePassword(int $userId, string $passwordHash, bool $forceChange = false): bool
+    {
+        $stmt = $this->db->prepare("
+            UPDATE gestao_social.usuarios
+               SET senha_hash = :hash,
+                   trocar_senha_obrigatorio = :force_change,
+                   tentativas_login = 0,
+                   bloqueado_ate = NULL
+             WHERE id = :id
+        ");
+        return $stmt->execute([
+            'id' => $userId,
+            'hash' => $passwordHash,
+            'force_change' => $forceChange ? 'true' : 'false',
+        ]);
+    }
+
+    public function toggleActive(int $userId, bool $active): bool
+    {
+        $stmt = $this->db->prepare("UPDATE gestao_social.usuarios SET ativo = :ativo WHERE id = :id");
+        return $stmt->execute([
+            'id' => $userId,
+            'ativo' => $active ? 'true' : 'false',
+        ]);
+    }
+
+    public function recordFailedLogin(int $userId, int $maxAttempts = 5, int $lockMinutes = 15): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE gestao_social.usuarios
+               SET tentativas_login = COALESCE(tentativas_login, 0) + 1,
+                   bloqueado_ate = CASE
+                       WHEN COALESCE(tentativas_login, 0) + 1 >= :max_attempts
+                       THEN CURRENT_TIMESTAMP + (:lock_minutes || ' minutes')::interval
+                       ELSE bloqueado_ate
+                   END
+             WHERE id = :id
+        ");
+        $stmt->execute([
+            'id' => $userId,
+            'max_attempts' => $maxAttempts,
+            'lock_minutes' => (string)$lockMinutes,
+        ]);
+    }
+
+    public function resetLoginAttempts(int $userId): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE gestao_social.usuarios
+               SET tentativas_login = 0,
+                   bloqueado_ate = NULL
+             WHERE id = :id
+        ");
+        $stmt->execute(['id' => $userId]);
+    }
+
+    public function updateLastAccess(int $userId): void
+    {
+        $stmt = $this->db->prepare("
+            UPDATE gestao_social.usuarios
+               SET ultimo_acesso = CURRENT_TIMESTAMP
+             WHERE id = :id
+        ");
+        $stmt->execute(['id' => $userId]);
     }
 
     private function mapRowToModel(array $row): Usuario
     {
         $perfil = $this->denormalizePerfil($row['perfil_nome'] ?? 'Consulta');
+        $decryptedSecret = SecurityHelper::decryptSecret($row['dois_fatores_secret'] ?? null);
 
         return new Usuario(
             (int)$row['id'],
@@ -130,13 +205,20 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
             $row['ultimo_acesso'] ? substr((string)$row['ultimo_acesso'], 0, 19) : null,
             $row['senha_hash'] ?? null,
             (bool)($row['dois_fatores_ativo'] ?? false),
-            $row['dois_fatores_secret'] ?? null,
-            json_decode((string)($row['dois_fatores_backup_codes'] ?? '[]'), true) ?: []
+            $decryptedSecret,
+            json_decode((string)($row['dois_fatores_backup_codes'] ?? '[]'), true) ?: [],
+            (string)($row['login'] ?? ''),
+            (bool)($row['trocar_senha_obrigatorio'] ?? false),
+            (int)($row['tentativas_login'] ?? 0),
+            !empty($row['bloqueado_ate']) ? substr((string)$row['bloqueado_ate'], 0, 19) : null
         );
     }
 
     public function setTwoFactorSecret(int $userId, string $secret, array $backupCodes): bool
     {
+        $encryptedSecret = SecurityHelper::encryptSecret($secret);
+        $hashedCodes = array_map(static fn(string $c) => password_hash(strtoupper(str_replace(['-', ' '], '', trim($c))), PASSWORD_BCRYPT), $backupCodes);
+
         $stmt = $this->db->prepare("
             UPDATE gestao_social.usuarios
                SET dois_fatores_secret = :secret,
@@ -145,8 +227,8 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
         ");
         return $stmt->execute([
             'id' => $userId,
-            'secret' => $secret,
-            'codes' => json_encode($backupCodes)
+            'secret' => $encryptedSecret,
+            'codes' => json_encode($hashedCodes),
         ]);
     }
 
@@ -181,13 +263,16 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
         $cleanTarget = strtoupper(str_replace(['-', ' '], '', trim($code)));
 
         foreach ($codes as $idx => $storedCode) {
-            $cleanStored = strtoupper(str_replace(['-', ' '], '', trim($storedCode)));
-            if ($cleanStored === $cleanTarget) {
+            $isMatch = str_starts_with((string)$storedCode, '$2')
+                ? password_verify($cleanTarget, (string)$storedCode)
+                : hash_equals(strtoupper(str_replace(['-', ' '], '', trim((string)$storedCode))), $cleanTarget);
+
+            if ($isMatch) {
                 unset($codes[$idx]);
                 $update = $this->db->prepare("UPDATE gestao_social.usuarios SET dois_fatores_backup_codes = :codes WHERE id = :id");
                 return $update->execute([
                     'id' => $userId,
-                    'codes' => json_encode(array_values($codes))
+                    'codes' => json_encode(array_values($codes)),
                 ]);
             }
         }
@@ -218,7 +303,8 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
             Usuario::PERFIL_ASSISTENTE_SOCIAL => 'Assistente Social',
             Usuario::PERFIL_ESTOQUE => 'Estoque',
             Usuario::PERFIL_ATENDIMENTO => 'Atendimento / Recepção',
-            default => 'Coordenação'
+            Usuario::PERFIL_CONSULTA => 'Consulta',
+            default => 'Consulta',
         };
     }
 
@@ -232,7 +318,7 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
             'Coordenação' => Usuario::PERFIL_COORDENACAO,
             'Assistente Social' => Usuario::PERFIL_ASSISTENTE_SOCIAL,
             'Estoque' => Usuario::PERFIL_ESTOQUE,
-            default => Usuario::PERFIL_CONSULTA
+            default => Usuario::PERFIL_CONSULTA,
         };
     }
 
@@ -240,6 +326,14 @@ final class UsuarioRepositoryDb implements UsuarioRepositoryInterface
     {
         $parts = explode('@', $email);
         $base = preg_replace('/[^a-z0-9.]/', '', strtolower($parts[0]));
-        return !empty($base) ? $base : 'user.' . time();
+        $candidate = !empty($base) ? $base : 'user.' . time();
+
+        $stmt = $this->db->prepare("SELECT 1 FROM gestao_social.usuarios WHERE LOWER(login) = LOWER(:login) LIMIT 1");
+        $stmt->execute(['login' => $candidate]);
+        if ($stmt->fetchColumn()) {
+            $candidate .= '.' . random_int(100, 999);
+        }
+
+        return $candidate;
     }
 }

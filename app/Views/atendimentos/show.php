@@ -19,7 +19,10 @@ use App\Models\Familia;
     <?php if ($familia): ?>
       <a href="/familias/<?= $familia->id ?>" class="btn btn-secondary btn-sm">Ver Ficha da Família</a>
     <?php endif; ?>
-    <button type="button" onclick="document.getElementById('modal-notificacao').style.display='flex'" class="btn btn-primary btn-sm no-print">📲 Notificar Cidadão</button>
+    <button type="button" onclick="document.getElementById('modal-notificacao').style.display='flex'" class="btn btn-primary btn-sm no-print">
+      <?= \App\Helpers\IconHelper::svg('bell', 14) ?>
+      <span>Notificar Cidadão</span>
+    </button>
     <button onclick="window.print()" class="btn btn-outline btn-sm no-print">Imprimir Registro</button>
   </div>
 </div>
@@ -150,7 +153,7 @@ use App\Models\Familia;
 <div id="modal-notificacao" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
   <div style="background: #ffffff; width: 100%; max-width: 520px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden;">
     <div style="background: var(--primary); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="font-size: 16px; font-weight: 700; margin: 0;">📲 Disparar Notificação ao Cidadão</h3>
+      <h3 style="font-size: 16px; font-weight: 700; margin: 0;">Disparar Notificação ao Cidadão</h3>
       <button type="button" onclick="document.getElementById('modal-notificacao').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
     </div>
     <form action="/notificacoes/enviar" method="POST" style="padding: 20px;">

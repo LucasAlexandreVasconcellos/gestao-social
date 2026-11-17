@@ -62,7 +62,7 @@ use App\Models\Produto;
 
         <div class="form-group col-3">
           <label class="form-label" for="responsavel">Recebido por <span class="required">*</span></label>
-          <input type="text" id="responsavel" name="responsavel" class="form-control" required value="<?= htmlspecialchars($old['responsavel'] ?? 'Fernanda Coordenadora', ENT_QUOTES, 'UTF-8') ?>">
+          <input type="text" id="responsavel" name="responsavel" class="form-control" required placeholder="Nome do operador" value="<?= htmlspecialchars($old['responsavel'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
         </div>
       </div>
 

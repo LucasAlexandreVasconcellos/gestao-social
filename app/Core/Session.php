@@ -15,12 +15,12 @@ final class Session
             return;
         }
 
-        // Garante que o diretório de armazenamento de sessão seja válido e gravável no ambiente
+        // Garante que o diretório de armazenamento de sessão seja válido e gravável com permissão restrita
         $savePath = session_save_path();
         if (empty($savePath) || !is_dir($savePath) || !is_writable($savePath) || str_contains($savePath, 'PATH_PHP')) {
             $customSavePath = (defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2)) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'sessions';
             if (!is_dir($customSavePath)) {
-                @mkdir($customSavePath, 0777, true);
+                @mkdir($customSavePath, 0750, true);
             }
             if (is_dir($customSavePath) && is_writable($customSavePath)) {
                 session_save_path($customSavePath);
@@ -52,6 +52,31 @@ final class Session
         if (!isset($_SESSION['_csrf_token'])) {
             $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
         }
+    }
+
+    /**
+     * Verifica timeout de inatividade e atualiza timestamp da última atividade.
+     * Retorna false se a sessão expirou por ociosidade.
+     */
+    public static function touchAndCheckIdleTimeout(?int $timeoutSeconds = null): bool
+    {
+        self::start();
+        if ($timeoutSeconds === null) {
+            $envVal = class_exists(Env::class) ? Env::get('SESSION_IDLE_TIMEOUT', 1800) : (getenv('SESSION_IDLE_TIMEOUT') ?: 1800);
+            $timeoutSeconds = max(60, (int)$envVal);
+        }
+
+        $now = time();
+        $lastActivity = $_SESSION['_last_activity'] ?? null;
+
+        if ($lastActivity !== null && ($now - (int)$lastActivity) > $timeoutSeconds) {
+            self::destroy();
+            self::start();
+            return false;
+        }
+
+        $_SESSION['_last_activity'] = $now;
+        return true;
     }
 
     public static function get(string $key, mixed $default = null): mixed
@@ -120,8 +145,8 @@ final class Session
         self::start();
         if (session_status() === PHP_SESSION_ACTIVE) {
             @session_regenerate_id($deleteOldSession);
-            // Renova o token CSRF junto com a sessão para máxima segurança
             $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+            $_SESSION['_last_activity'] = time();
         }
     }
 

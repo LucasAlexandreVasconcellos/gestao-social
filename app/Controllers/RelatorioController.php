@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Core\Request;
+use App\Core\Response;
 use App\Core\View;
 use App\Helpers\FormatHelper;
 use App\Services\AuditLogService;
+use App\Services\AuthService;
 use App\Services\FamiliaService;
 use App\Services\RelatorioService;
 
@@ -16,7 +18,8 @@ final class RelatorioController
     public function __construct(
         private RelatorioService $relatorioService,
         private FamiliaService $familiaService,
-        private AuditLogService $auditLogService
+        private AuditLogService $auditLogService,
+        private AuthService $authService
     ) {}
 
     public function index(Request $request): string
@@ -39,8 +42,14 @@ final class RelatorioController
     {
         $tipo = $request->query('tipo', 'familias');
         $bairros = $this->familiaService->getBairros();
-        // Por padrão no modo visualização, preserva a privacidade de nomes sensíveis (Privacy by Default)
-        $anonimizado = (bool)$request->query('anonimizado', 1);
+        // Por padrão preserva a privacidade de nomes sensíveis (Privacy by Default)
+        $anonimizado = $request->query('anonimizado', '1') !== '0';
+        $user = $this->authService->getCurrentUser();
+
+        if (!$anonimizado && (!$user || !$user->can('relatorios.nominal'))) {
+            Response::html(View::render('errors/403', ['permission' => 'relatorios.nominal']), 403);
+            return '';
+        }
 
         $dados = [];
         $titulo = 'Relatório';
@@ -93,8 +102,13 @@ final class RelatorioController
     public function export(Request $request): void
     {
         $tipo = $request->query('tipo', 'familias');
-        // Suporte ao parâmetro anonimizado (padrão = 1 para conformidade LGPD)
-        $anonimizado = (bool)$request->query('anonimizado', 1);
+        $anonimizado = $request->query('anonimizado', '1') !== '0';
+        $user = $this->authService->getCurrentUser();
+
+        if (!$anonimizado && (!$user || !$user->can('relatorios.nominal'))) {
+            Response::html(View::render('errors/403', ['permission' => 'relatorios.nominal']), 403);
+            return;
+        }
 
         $modoDesc = $anonimizado ? 'Anonimizado / Pseudonimizado (LGPD Art. 13)' : 'Nominal Identificado (Uso Técnico Restrito)';
         $this->auditLogService->log(

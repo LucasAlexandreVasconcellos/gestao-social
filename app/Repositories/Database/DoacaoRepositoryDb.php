@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\DoacaoRepositoryInterface;
 use App\Core\Database;
+use App\Core\Session;
 use App\Models\Doacao;
 use App\Models\ItemDoacao;
 use PDO;
@@ -30,7 +31,7 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
     public function findAll(array $filters = []): array
     {
         $sql = "SELECT d.*, 
-                       dor.nome AS doador_nome, dor.tipo AS doador_tipo, 
+                       dor.nome AS doador_nome, COALESCE(dor.tipo_doador, dor.tipo) AS doador_tipo, 
                        dor.documento AS doador_doc, dor.telefone AS doador_tel, 
                        dor.email AS doador_email,
                        u.nome AS responsavel_nome
@@ -71,7 +72,7 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
     {
         $stmt = $this->db->prepare("
             SELECT d.*, 
-                   dor.nome AS doador_nome, dor.tipo AS doador_tipo, 
+                   dor.nome AS doador_nome, COALESCE(dor.tipo_doador, dor.tipo) AS doador_tipo, 
                    dor.documento AS doador_doc, dor.telefone AS doador_tel, 
                    dor.email AS doador_email,
                    u.nome AS responsavel_nome
@@ -95,41 +96,56 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
     public function save(Doacao $doacao): Doacao
     {
         $responsavelId = $this->resolveResponsavelId($doacao->responsavel);
-        $doadorId = $this->resolveDoadorId($doacao);
 
-        $sql = "INSERT INTO gestao_social.doacoes (
-                    doador_id, responsavel_id, data_doacao, tipo_doacao,
-                    status, valor_estimado, descricao, documento_comprovante
-                ) VALUES (
-                    :doador_id, :responsavel_id, :data_doacao, :tipo,
-                    'Pendente', :valor, :descricao, :comprovante
-                ) RETURNING id";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            'doador_id' => $doadorId,
-            'responsavel_id' => $responsavelId,
-            'data_doacao' => $doacao->dataRecebimento ?: date('Y-m-d H:i:s'),
-            'tipo' => $this->normalizeTipo($doacao->tipoDoacao),
-            'valor' => $doacao->valorEstimado ?: 0.00,
-            'descricao' => $doacao->descricao,
-            'comprovante' => $doacao->comprovante,
-        ]);
-
-        $doacao->id = (int)$stmt->fetchColumn();
-
-        // Se houver itens já anexados, insere-os
-        if (!empty($doacao->itens)) {
-            foreach ($doacao->itens as $item) {
-                if ($item instanceof ItemDoacao) {
-                    $item->doacaoId = $doacao->id;
-                    $this->addItem($item);
-                }
-            }
+        $startedTx = !$this->db->inTransaction();
+        if ($startedTx) {
+            $this->db->beginTransaction();
         }
 
-        // Confirma a doação para disparar entrada no estoque e registrar lotes
-        $this->confirmarDoacao($doacao->id);
+        try {
+            $doadorId = $this->resolveDoadorId($doacao);
+
+            $sql = "INSERT INTO gestao_social.doacoes (
+                        doador_id, responsavel_id, data_doacao, tipo_doacao,
+                        status, valor_estimado, descricao, documento_comprovante
+                    ) VALUES (
+                        :doador_id, :responsavel_id, :data_doacao, :tipo,
+                        'Pendente', :valor, :descricao, :comprovante
+                    ) RETURNING id";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                'doador_id' => $doadorId,
+                'responsavel_id' => $responsavelId,
+                'data_doacao' => $doacao->dataRecebimento ?: date('Y-m-d H:i:s'),
+                'tipo' => $this->normalizeTipo($doacao->tipoDoacao),
+                'valor' => $doacao->valorEstimado ?: 0.00,
+                'descricao' => $doacao->descricao,
+                'comprovante' => $doacao->comprovante,
+            ]);
+
+            $doacao->id = (int)$stmt->fetchColumn();
+
+            if (!empty($doacao->itens)) {
+                foreach ($doacao->itens as $item) {
+                    if ($item instanceof ItemDoacao) {
+                        $item->doacaoId = $doacao->id;
+                        $this->addItem($item);
+                    }
+                }
+            }
+
+            $this->confirmarDoacao($doacao->id);
+
+            if ($startedTx && $this->db->inTransaction()) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($startedTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
 
         return $doacao;
     }
@@ -144,11 +160,15 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
             $produtoId = (int)$stmtProd->fetchColumn();
 
             if (!$produtoId) {
-                $stmtInsertProd = $this->db->prepare("INSERT INTO gestao_social.produtos (categoria_id, codigo, nome, unidade_medida) VALUES (1, :cod, :nome, :unidade) RETURNING id");
+                $stmtCat = $this->db->query("SELECT id FROM gestao_social.categorias_produtos ORDER BY id ASC LIMIT 1");
+                $catId = (int)($stmtCat->fetchColumn() ?: 1);
+
+                $stmtInsertProd = $this->db->prepare("INSERT INTO gestao_social.produtos (categoria_id, codigo, nome, unidade_medida) VALUES (:cat_id, :cod, :nome, :unidade) RETURNING id");
                 $stmtInsertProd->execute([
-                    'cod' => 'PROD-AUTO-' . time(),
+                    'cat_id' => $catId,
+                    'cod' => 'PROD-AUTO-' . bin2hex(random_bytes(3)),
                     'nome' => $item->nomeProduto,
-                    'unidade' => $item->unidadeMedida ?: 'Unidade'
+                    'unidade' => $this->normalizeUnidade($item->unidadeMedida)
                 ]);
                 $produtoId = (int)$stmtInsertProd->fetchColumn();
             }
@@ -233,8 +253,8 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
     private function mapRowToModel(array $row): Doacao
     {
         $tipoDoador = match ($row['doador_tipo'] ?? 'Anônimo') {
-            'Física' => 'Pessoa Física',
-            'Jurídica' => 'Pessoa Jurídica',
+            'PF', 'Física' => 'Pessoa Física',
+            'PJ', 'Jurídica' => 'Pessoa Jurídica',
             default => 'Anônimo'
         };
 
@@ -259,6 +279,21 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
             $row['responsavel_nome'] ?? 'Coordenação',
             []
         );
+    }
+
+    private function normalizeUnidade(string $unidade): string
+    {
+        $u = mb_strtoupper(trim($unidade), 'UTF-8');
+        if (in_array($u, ['UN', 'KG', 'LITRO', 'PCT', 'CX', 'LATA', 'KIT'], true)) {
+            return $u;
+        }
+        if (str_contains($u, 'QUILO') || $u === 'KGS') return 'KG';
+        if (str_contains($u, 'LITRO') || $u === 'L' || $u === 'LT') return 'LITRO';
+        if (str_contains($u, 'PACOT')) return 'PCT';
+        if (str_contains($u, 'CAIX')) return 'CX';
+        if (str_contains($u, 'LATA')) return 'LATA';
+        if (str_contains($u, 'KIT')) return 'KIT';
+        return 'UN';
     }
 
     private function normalizeTipo(string $tipo): string
@@ -286,18 +321,23 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
             if ($id) return (int)$id;
         }
 
-        $tipoDoadorDb = str_contains(mb_strtolower($doacao->tipoDoador, 'UTF-8'), 'jurídica') ? 'Jurídica' : 'Física';
+        $cleanTel = !empty($doacao->telefone) ? preg_replace('/\D/', '', (string)$doacao->telefone) : '';
+        $telefoneDb = (strlen($cleanTel) >= 10 && strlen($cleanTel) <= 11) ? $cleanTel : null;
+        $emailDb = (!empty($doacao->email) && filter_var(trim($doacao->email), FILTER_VALIDATE_EMAIL)) ? trim($doacao->email) : null;
+
+        $tipoSigla = str_contains(mb_strtolower($doacao->tipoDoador, 'UTF-8'), 'jurídica') ? 'PJ' : 'PF';
         $stmtInsert = $this->db->prepare("
-            INSERT INTO gestao_social.doadores (tipo, nome, documento, telefone, email)
-            VALUES (:tipo, :nome, :doc, :tel, :email)
+            INSERT INTO gestao_social.doadores (tipo, tipo_doador, nome, documento, telefone, email)
+            VALUES (:tipo, :tipo_doador, :nome, :doc, :tel, :email)
             RETURNING id
         ");
         $stmtInsert->execute([
-            'tipo' => $tipoDoadorDb,
+            'tipo' => $tipoSigla,
+            'tipo_doador' => $tipoSigla,
             'nome' => $doacao->nomeDoador,
-            'doc' => $cleanDoc,
-            'tel' => $doacao->telefone,
-            'email' => $doacao->email,
+            'doc' => $cleanDoc ?: null,
+            'tel' => $telefoneDb,
+            'email' => $emailDb,
         ]);
 
         return (int)$stmtInsert->fetchColumn();
@@ -305,22 +345,29 @@ final class DoacaoRepositoryDb implements DoacaoRepositoryInterface
 
     private function resolveResponsavelId(string $nomeOuIdentificador): int
     {
-        $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
-        $stmt->execute([
-            'busca' => '%' . mb_strtolower(trim($nomeOuIdentificador), 'UTF-8') . '%',
-            'login' => mb_strtolower(trim($nomeOuIdentificador), 'UTF-8')
-        ]);
-        $id = $stmt->fetchColumn();
+        $busca = mb_strtolower(trim($nomeOuIdentificador), 'UTF-8');
+        if ($busca !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
+            $stmt->execute([
+                'busca' => '%' . $busca . '%',
+                'login' => $busca
+            ]);
+            $id = $stmt->fetchColumn();
+            if ($id) {
+                return (int)$id;
+            }
+        }
 
-        if ($id) {
-            return (int)$id;
+        $sessionUser = Session::get('user');
+        if (!empty($sessionUser['id'])) {
+            return (int)$sessionUser['id'];
         }
 
         $stmtDefault = $this->db->query("
             SELECT u.id 
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE p.nome IN ('Coordenação', 'Estoque', 'Administrador')
+             WHERE u.ativo = TRUE AND p.nome IN ('Coordenação', 'Estoque', 'Administrador')
              ORDER BY u.id ASC
              LIMIT 1
         ");

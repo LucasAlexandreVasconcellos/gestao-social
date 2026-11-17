@@ -16,6 +16,7 @@ use App\Contracts\Repositories\ProjetoRepositoryInterface;
 use App\Contracts\Repositories\UsuarioRepositoryInterface;
 use App\Core\Container;
 use App\Core\Database;
+use App\Core\Env;
 use App\Repositories\Database\AtendimentoRepositoryDb;
 use App\Repositories\Database\AuditoriaRepositoryDb;
 use App\Repositories\Database\AvaliacaoRepositoryDb;
@@ -29,12 +30,16 @@ use App\Repositories\Database\PessoaRepositoryDb;
 use App\Repositories\Database\ProjetoRepositoryDb;
 use App\Repositories\Database\UsuarioRepositoryDb;
 
+// Carrega .env se disponível
+if (class_exists(Env::class)) {
+    Env::load(dirname(__DIR__) . '/.env');
+}
+
 // Fuso horário institucional
 date_default_timezone_set('America/Sao_Paulo');
 
-// Injeção Oficial de Dependências — Versão Final com Banco de Dados PostgreSQL
-// Todos os repositórios operam com persistência real no PostgreSQL (schema: gestao_social)
-$isTesting = (getenv('APP_ENV') === 'testing');
+$appEnv = class_exists(Env::class) ? (string)Env::get('APP_ENV', 'production') : (getenv('APP_ENV') ?: 'production');
+$isTesting = ($appEnv === 'testing');
 
 if (!$isTesting) {
     Container::singleton(\PDO::class, fn() => Database::getConnection());
@@ -51,7 +56,7 @@ if (!$isTesting) {
     Container::singleton(DocumentoRepositoryInterface::class, DocumentoRepositoryDb::class);
     Container::singleton(NotificacaoRepositoryInterface::class, NotificacaoRepositoryDb::class);
 } else {
-    // Ambiente isolado de testes unitários automatizados (apenas quando acionado via CLI)
+    // Ambiente isolado de testes unitários automatizados (exclusivo via CLI)
     Container::singleton(FamiliaRepositoryInterface::class, \App\Repositories\Demo\FamiliaRepositoryDemo::class);
     Container::singleton(PessoaRepositoryInterface::class, \App\Repositories\Demo\PessoaRepositoryDemo::class);
     Container::singleton(AvaliacaoRepositoryInterface::class, \App\Repositories\Demo\AvaliacaoRepositoryDemo::class);
@@ -68,9 +73,12 @@ if (!$isTesting) {
 
 return [
     'name' => 'Sistema de Gestão Social e Assistencial',
-    'version' => '1.0.0',
-    'env' => getenv('APP_ENV') ?: 'production',
+    'org_name' => (string)(class_exists(Env::class) ? Env::get('APP_ORG_NAME', 'Secretaria Municipal de Assistência Social') : 'Secretaria Municipal de Assistência Social'),
+    'unit_name' => (string)(class_exists(Env::class) ? Env::get('APP_UNIT_NAME', 'Gestão Socioassistencial — SUAS') : 'Gestão Socioassistencial — SUAS'),
+    'public_url' => rtrim((string)(class_exists(Env::class) ? Env::get('APP_PUBLIC_URL', 'http://localhost:8000') : 'http://localhost:8000'), '/'),
+    'version' => '2.0.0',
+    'env' => $appEnv,
     'demo_mode' => false,
     'db_driver' => 'pgsql',
-    'charset' => 'UTF-8'
+    'charset' => 'UTF-8',
 ];

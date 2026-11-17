@@ -60,15 +60,19 @@ final class DocumentoRepositoryDb implements DocumentoRepositoryInterface
     public function save(Documento $documento): Documento
     {
         if ($documento->id <= 0) {
+            $hash = $documento->hashSha256 !== ''
+                ? $documento->hashSha256
+                : hash('sha256', $documento->nomeArquivo . '|' . $documento->tamanhoBytes);
+
             $stmt = $this->db->prepare("
                 INSERT INTO gestao_social.documentos (
                     entidade_tipo, entidade_id, tipo_documento, descricao,
-                    nome_original, nome_arquivo, caminho_relativo, mime_type,
-                    tamanho_bytes, usuario_upload_id, data_upload
+                    nome_original, nome_arquivo, caminho_arquivo, mime_type,
+                    tamanho_bytes, hash_sha256, usuario_id, data_upload
                 ) VALUES (
                     :entidade_tipo, :entidade_id, :tipo_documento, :descricao,
-                    :nome_original, :nome_arquivo, :caminho_relativo, :mime_type,
-                    :tamanho_bytes, :usuario_upload_id, :data_upload
+                    :nome_original, :nome_arquivo, :caminho_arquivo, :mime_type,
+                    :tamanho_bytes, :hash_sha256, :usuario_id, :data_upload
                 ) RETURNING id
             ");
             $stmt->execute([
@@ -78,13 +82,15 @@ final class DocumentoRepositoryDb implements DocumentoRepositoryInterface
                 'descricao' => $documento->descricao,
                 'nome_original' => $documento->nomeOriginal,
                 'nome_arquivo' => $documento->nomeArquivo,
-                'caminho_relativo' => $documento->caminhoRelativo,
+                'caminho_arquivo' => $documento->caminhoRelativo,
                 'mime_type' => $documento->mimeType,
                 'tamanho_bytes' => $documento->tamanhoBytes,
-                'usuario_upload_id' => $documento->usuarioUploadId,
-                'data_upload' => $documento->dataUpload ?: date('Y-m-d H:i:s')
+                'hash_sha256' => $hash,
+                'usuario_id' => $documento->usuarioUploadId,
+                'data_upload' => $documento->dataUpload ?: date('Y-m-d H:i:s'),
             ]);
             $documento->id = (int)$stmt->fetchColumn();
+            $documento->hashSha256 = $hash;
         } else {
             $stmt = $this->db->prepare("
                 UPDATE gestao_social.documentos SET
@@ -119,11 +125,12 @@ final class DocumentoRepositoryDb implements DocumentoRepositoryInterface
             descricao: $row['descricao'] ?? '',
             nomeOriginal: $row['nome_original'],
             nomeArquivo: $row['nome_arquivo'],
-            caminhoRelativo: $row['caminho_relativo'],
+            caminhoRelativo: $row['caminho_arquivo'] ?? $row['caminho_relativo'] ?? '',
             mimeType: $row['mime_type'],
             tamanhoBytes: (int)$row['tamanho_bytes'],
-            usuarioUploadId: isset($row['usuario_upload_id']) ? (int)$row['usuario_upload_id'] : null,
-            dataUpload: $row['data_upload']
+            usuarioUploadId: isset($row['usuario_id']) ? (int)$row['usuario_id'] : (isset($row['usuario_upload_id']) ? (int)$row['usuario_upload_id'] : null),
+            dataUpload: (string)($row['data_upload'] ?? ''),
+            hashSha256: (string)($row['hash_sha256'] ?? '')
         );
     }
 }

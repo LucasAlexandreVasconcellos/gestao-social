@@ -7,11 +7,12 @@ namespace App\Middleware;
 use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
+use App\Core\View;
 use App\Models\Usuario;
 
 final class RoleMiddleware
 {
-    public function handle(Request $request): bool
+    public function handle(Request $request, ?string $permission = null): bool
     {
         $userData = Session::get('user');
         if (!$userData) {
@@ -20,11 +21,11 @@ final class RoleMiddleware
         }
 
         $user = new Usuario(
-            $userData['id'],
-            $userData['nome'],
-            $userData['email'],
-            $userData['perfil'],
-            $userData['ativo'] ?? true
+            (int)$userData['id'],
+            (string)$userData['nome'],
+            (string)$userData['email'],
+            (string)$userData['perfil'],
+            (bool)($userData['ativo'] ?? true)
         );
 
         if (!$user->ativo) {
@@ -34,11 +35,21 @@ final class RoleMiddleware
             return false;
         }
 
-        // Se a requisição for de alteração (POST) e o usuário for do perfil 'Consulta', bloqueia a mutação
+        // Bloqueio universal de mutações para perfil estritamente somente leitura
         if ($request->isPost() && $user->perfil === Usuario::PERFIL_CONSULTA) {
-            Session::flash('error', 'Acesso negado: Usuários com perfil [Consulta] possuem acesso estritamente somente leitura.');
-            $referer = $_SERVER['HTTP_REFERER'] ?? '/dashboard';
-            Response::redirect($referer);
+            http_response_code(403);
+            echo View::render('errors/403', [
+                'message' => 'Usuários com perfil Consulta possuem acesso estritamente somente leitura.'
+            ], 'layouts/main');
+            return false;
+        }
+
+        // Verificação estrita da permissão exigida pela rota (GET e POST)
+        if ($permission !== null && !$user->can($permission)) {
+            http_response_code(403);
+            echo View::render('errors/403', [
+                'message' => "Seu perfil ({$user->perfil}) não possui autorização para executar esta operação ({$permission})."
+            ], 'layouts/main');
             return false;
         }
 

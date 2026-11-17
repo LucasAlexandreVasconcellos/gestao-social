@@ -24,6 +24,8 @@ interface ProjetoRepositoryInterface
 
     public function updateParticipante(ParticipanteProjeto $participante): bool;
 
+    public function findParticipanteById(int $participanteId): ?ParticipanteProjeto;
+
     /**
      * @return ParticipanteProjeto[]
      */

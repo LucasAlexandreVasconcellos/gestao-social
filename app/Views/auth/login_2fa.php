@@ -1,74 +1,71 @@
 <?php
-use App\Models\Usuario;
-
-/** @var Usuario|null $pendingUser */
-/** @var bool $isBackup */
-/** @var string|null $error */
+use App\Helpers\CsrfHelper;
+use App\Helpers\IconHelper;
 ?>
-<div class="card" style="box-shadow: var(--shadow-lg);">
-  <div style="background-color: var(--primary); color: #ffffff; padding: 24px; text-align: center; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-    <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-bottom: 8px;">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
-    <h2 style="font-size: 20px; font-weight: 700;">Verificação em Duas Etapas</h2>
-    <p style="font-size: 13px; opacity: 0.9; margin-top: 4px;">Proteção de Acesso em Nível Institucional (RFC 6238)</p>
-  </div>
-
-  <div class="card-body">
-    <?php if (!empty($error)): ?>
-      <div class="alert alert-danger" style="margin-bottom: 16px;">
-        <span><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></span>
+<div class="auth-shell compact">
+  <div class="auth-form-panel">
+    <div class="text-center mb-4">
+      <div class="stat-icon-pill" style="width: 48px; height: 48px; margin: 0 auto 12px;">
+        <?= IconHelper::svg('shield-check', 24) ?>
       </div>
-    <?php endif; ?>
-
-    <div style="text-align: center; margin-bottom: 20px;">
-      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
-        Olá, <strong><?= htmlspecialchars($pendingUser?->nome ?? 'Usuário', ENT_QUOTES, 'UTF-8') ?></strong>.<br>
-        <?php if ($isBackup): ?>
-          Digite um dos seus <strong>Códigos de Recuperação (Backup)</strong> de uso único para acessar.
-        <?php else: ?>
-          Abra seu aplicativo autenticador (Google Authenticator, Microsoft Authenticator, FreeOTP) e insira o código de 6 dígitos.
-        <?php endif; ?>
+      <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--text-main);">Verificação em Dois Fatores</h2>
+      <p class="text-muted" style="font-size: 0.85rem; margin-top: 4px;">
+        <?= $e($pendingUser ? $pendingUser->nome : 'Conta autenticada') ?>
       </p>
     </div>
 
-    <form action="/login/2fa" method="POST">
-      <?= \App\Core\View::render('partials/csrf', [], null) ?>
+    <?php if (!empty($error)): ?>
+      <div class="alert alert-danger" role="alert">
+        <?= IconHelper::svg('x-circle', 18) ?>
+        <div><?= $e($error) ?></div>
+      </div>
+    <?php endif; ?>
+
+    <form method="POST" action="/login/2fa">
+      <?= CsrfHelper::input() ?>
       <input type="hidden" name="is_backup" value="<?= $isBackup ? '1' : '0' ?>">
 
-      <div class="form-group" style="margin-bottom: 24px; text-align: center;">
-        <?php if ($isBackup): ?>
-          <label class="form-label" for="code" style="text-align: center;">Código de Backup (Ex: ABCD-1234)</label>
-          <input type="text" id="code" name="code" class="form-control" placeholder="XXXX-XXXX" required autofocus
-                 style="font-size: 22px; font-weight: 700; text-align: center; letter-spacing: 4px; text-transform: uppercase;">
-        <?php else: ?>
-          <label class="form-label" for="code" style="text-align: center;">Código Numérico do Aplicativo</label>
-          <input type="text" id="code" name="code" class="form-control" placeholder="000 000" maxlength="8" required autofocus autocomplete="one-time-code" inputmode="numeric"
-                 style="font-size: 26px; font-weight: 800; text-align: center; letter-spacing: 8px;">
-        <?php endif; ?>
-      </div>
+      <?php if ($isBackup): ?>
+        <div class="alert alert-info mb-3">
+          <?= IconHelper::svg('key', 18) ?>
+          <div>Digite um dos <strong>códigos de recuperação</strong> de uso único fornecidos na configuração do seu 2FA.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="code">Código de Backup <span class="required">*</span></label>
+          <input type="text" id="code" name="code" class="form-control mono text-center"
+                 placeholder="ABCD-1234" required autofocus autocomplete="off"
+                 style="font-size: 1.15rem; letter-spacing: 0.14em; text-transform: uppercase;">
+        </div>
+      <?php else: ?>
+        <p class="text-muted mb-3" style="font-size: 0.86rem; text-align: center;">
+          Informe o código de 6 dígitos gerado pelo seu aplicativo autenticador (Google Authenticator, Authy ou compatível).
+        </p>
+        <div class="form-group">
+          <label class="form-label" for="code">Código TOTP (6 dígitos) <span class="required">*</span></label>
+          <input type="text" id="code" name="code" class="form-control mono text-center"
+                 placeholder="000000" maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+                 required autofocus autocomplete="one-time-code"
+                 style="font-size: 1.45rem; letter-spacing: 0.32em; font-weight: 700;">
+        </div>
+      <?php endif; ?>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 600;">
-        Verificar e Acessar Painel
+      <button type="submit" class="btn btn-primary btn-block" style="padding: 10px;">
+        <?= IconHelper::svg('check-circle', 16) ?>
+        <span>Confirmar Autenticação</span>
       </button>
     </form>
 
-    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); text-align: center; display: flex; flex-direction: column; gap: 10px;">
+    <div class="mt-4" style="padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; align-items: center;">
       <?php if ($isBackup): ?>
-        <a href="/login/2fa" style="font-size: 13px; color: var(--primary); text-decoration: none; font-weight: 600;">
-          ← Voltar para código do Aplicativo Autenticador (TOTP)
-        </a>
+        <a href="/login/2fa" style="font-size: 0.84rem; font-weight: 600;">Voltar ao código TOTP de 6 dígitos</a>
       <?php else: ?>
-        <a href="/login/2fa?backup=1" style="font-size: 13px; color: var(--text-muted); text-decoration: none;">
-          Não está com o smartphone? <strong>Usar código de backup</strong>
-        </a>
+        <a href="/login/2fa?backup=1" style="font-size: 0.84rem; font-weight: 600;">Sem acesso ao aplicativo? Usar código de backup</a>
       <?php endif; ?>
 
-      <form action="/login/2fa/cancelar" method="POST" style="margin-top: 4px;">
-        <?= \App\Core\View::render('partials/csrf', [], null) ?>
-        <button type="submit" class="btn btn-outline btn-sm" style="font-size: 12px; color: var(--text-muted);">
-          Cancelar e Voltar ao Início
+      <form method="POST" action="/login/2fa/cancelar">
+        <?= CsrfHelper::input() ?>
+        <button type="submit" style="background: none; border: none; color: var(--text-muted); font-size: 0.82rem; cursor: pointer; text-decoration: underline;">
+          Cancelar e voltar ao login
         </button>
       </form>
     </div>

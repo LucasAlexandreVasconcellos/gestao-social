@@ -74,4 +74,5 @@ use App\Helpers\FormatHelper;
       </tbody>
     </table>
   </div>
+  <?= \App\Core\View::renderPartial('partials/pagination', ['pagination' => $pagination ?? null, 'basePath' => '/pessoas', 'query' => $filters ?? []]) ?>
 </div>

@@ -37,6 +37,8 @@ final class DoacaoService
             ->minLength('nomeDoador', 2, 'Nome do Doador')
             ->required('tipoDoador', 'Tipo de Doador')
             ->inList('tipoDoador', ['Pessoa Física', 'Pessoa Jurídica', 'Anônimo'], 'Tipo de Doador')
+            ->cpfOrCnpj('documento', 'CPF / CNPJ do Doador', false)
+            ->email('email', 'E-mail do Doador', false)
             ->required('tipoDoacao', 'Tipo de Doação')
             ->inList('tipoDoacao', ['Produtos', 'Financeira', 'Serviços/Outros'], 'Tipo de Doação')
             ->required('dataRecebimento', 'Data de Recebimento')
@@ -49,7 +51,32 @@ final class DoacaoService
 
         $valorEstimado = null;
         if (!empty($dados['valorEstimado'])) {
-            $valorEstimado = (float)str_replace(',', '.', (string)$dados['valorEstimado']);
+            $valorEstimado = FormValidator::normalizeMoneyInput($dados['valorEstimado']);
+        }
+
+        $itensModels = [];
+        $itensInput = $dados['itens'] ?? [];
+        if (trim($dados['tipoDoacao']) === 'Produtos' && !empty($itensInput) && is_array($itensInput)) {
+            foreach ($itensInput as $itemData) {
+                if (empty($itemData['nomeProduto']) || empty($itemData['quantidade'])) {
+                    continue;
+                }
+                $qtd = (float)str_replace(',', '.', (string)$itemData['quantidade']);
+                if ($qtd <= 0) {
+                    continue;
+                }
+                $prodId = !empty($itemData['produtoId']) ? (int)$itemData['produtoId'] : null;
+                $itensModels[] = new ItemDoacao(
+                    0,
+                    0,
+                    $prodId,
+                    trim($itemData['nomeProduto']),
+                    $qtd,
+                    trim($itemData['unidadeMedida'] ?? 'UN'),
+                    trim($itemData['lote'] ?? '') ?: null,
+                    trim($itemData['dataValidade'] ?? '') ?: null
+                );
+            }
         }
 
         $doacao = new Doacao(
@@ -65,43 +92,20 @@ final class DoacaoService
             trim($dados['descricao'] ?? ''),
             trim($dados['comprovante'] ?? '') ?: null,
             trim($dados['responsavel']),
-            []
+            $itensModels
         );
 
-        $saved = $this->doacaoRepo->save($doacao);
+        try {
+            $saved = $this->doacaoRepo->save($doacao);
+        } catch (\Throwable $e) {
+            return ['success' => false, 'errors' => ['geral' => 'Não foi possível registrar a doação: ' . $e->getMessage()]];
+        }
 
-        // Se a doação for de produtos e houver itens informados
-        $itensInput = $dados['itens'] ?? [];
-        if ($saved->tipoDoacao === 'Produtos' && !empty($itensInput) && is_array($itensInput)) {
-            foreach ($itensInput as $itemData) {
-                if (empty($itemData['nomeProduto']) || empty($itemData['quantidade'])) {
-                    continue;
-                }
-
-                $qtd = (float)str_replace(',', '.', (string)$itemData['quantidade']);
-                if ($qtd <= 0) {
-                    continue;
-                }
-
-                $prodId = !empty($itemData['produtoId']) ? (int)$itemData['produtoId'] : null;
-
-                $item = new ItemDoacao(
-                    0,
-                    $saved->id,
-                    $prodId,
-                    trim($itemData['nomeProduto']),
-                    $qtd,
-                    trim($itemData['unidadeMedida'] ?? 'Unidade'),
-                    trim($itemData['lote'] ?? '') ?: null,
-                    trim($itemData['dataValidade'] ?? '') ?: null
-                );
-
-                $this->doacaoRepo->addItem($item);
-
-                // Na simulação em memória (modo Demo), realiza a entrada manual.
-                // No PostgreSQL, a trigger trg_ciclo_status_doacao_estoque realiza a entrada automaticamente quando o status for 'Confirmada'.
-                if ($this->isDemoEstoque() && $prodId) {
-                    $produto = $this->estoqueRepo->findProdutoById($prodId);
+        // Em modo Demo em memória, espelha entradas manuais no estoque; em PostgreSQL, a trigger faz atomicamente
+        if ($this->isDemoEstoque() && $saved->tipoDoacao === 'Produtos') {
+            foreach ($saved->itens as $item) {
+                if ($item->produtoId) {
+                    $produto = $this->estoqueRepo->findProdutoById($item->produtoId);
                     if ($produto) {
                         $mov = new MovimentacaoEstoque(
                             0,
@@ -109,7 +113,7 @@ final class DoacaoService
                             $produto->id,
                             $produto->nome,
                             'Entrada',
-                            $qtd,
+                            $item->quantidade,
                             $item->lote,
                             $item->dataValidade,
                             "Doação #{$saved->id} ({$saved->nomeDoador})",

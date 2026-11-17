@@ -78,10 +78,10 @@ final class AuditoriaRepositoryDb implements AuditoriaRepositoryInterface
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
             'usuario_id' => $registro->usuarioId ?: null,
-            'identificador' => $registro->usuarioNome ?: 'Sistema',
+            'identificador' => mb_substr($registro->usuarioNome ?: 'Sistema', 0, 150, 'UTF-8'),
             'data_hora' => $registro->dataHora ?: date('Y-m-d H:i:s'),
-            'operacao' => $registro->operacao,
-            'tabela' => 'gestao_social.' . strtolower($registro->entidade),
+            'operacao' => mb_substr($registro->operacao, 0, 80, 'UTF-8'),
+            'tabela' => mb_substr('gestao_social.' . strtolower($registro->entidade), 0, 100, 'UTF-8'),
             'registro_id' => is_numeric($registro->registroId) ? (int)$registro->registroId : null,
             'dados_novos' => $detalhesJson,
             'ip' => $ip,

@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\DocumentoService;
 use App\Services\FamiliaService;
 use App\Services\PdfService;
@@ -30,9 +31,12 @@ final class FamiliaController
 
         $familias = $this->familiaService->listar($filters);
         $bairros = $this->familiaService->getBairros();
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($familias, $page, 15);
 
         return View::render('familias/index', [
-            'familias' => $familias,
+            'familias' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters,
             'bairros' => $bairros
         ]);

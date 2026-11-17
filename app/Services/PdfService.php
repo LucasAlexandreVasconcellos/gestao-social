@@ -11,6 +11,7 @@ use App\Contracts\Repositories\DoacaoRepositoryInterface;
 use App\Contracts\Repositories\FamiliaRepositoryInterface;
 use App\Contracts\Repositories\PessoaRepositoryInterface;
 use App\Contracts\Repositories\ProdutoRepositoryInterface;
+use App\Core\Env;
 use App\Core\Pdf;
 use App\Core\QrCode;
 use App\Helpers\FormatHelper;
@@ -53,22 +54,26 @@ final class PdfService
         }
 
         $protocolo = sprintf('BEN-%s-%04d', date('Y', strtotime($beneficio->dataEntrega)), $beneficio->id);
-        $hashValidacao = hash('sha256', "BENEFICIO:{$protocolo}:{$beneficio->dataEntrega}:{$beneficio->familiaId}");
-        $shortHash = strtoupper(substr($hashValidacao, 0, 16));
+        $payload = "BENEFICIO:{$protocolo}:{$beneficio->dataEntrega}:{$beneficio->familiaId}";
+        $shortHash = SecurityHelper::signDocumentPayload($payload);
 
-        $qrCode = QrCode::create("https://gestaosocial.gov.br/validar/beneficio/{$protocolo}?h={$shortHash}");
+        $publicBase = rtrim((string)(Env::get('APP_PUBLIC_URL', 'http://localhost') ?: 'http://localhost'), '/');
+        $publicHost = parse_url($publicBase, PHP_URL_HOST) ?: 'localhost';
+        $orgName = (string)(Env::get('APP_ORG_NAME', 'Secretaria Municipal de Assistência Social') ?: 'Secretaria Municipal de Assistência Social');
+
+        $qrCode = QrCode::create("{$publicBase}/validar/beneficio/{$protocolo}?h={$shortHash}");
 
         $pdf = Pdf::create("Termo de Recebimento de Benefício — {$protocolo}");
         $pdf->drawHeader(
             'TERMO DE CONCESSÃO E RECEBIMENTO DE BENEFÍCIO',
-            'Secretaria Municipal de Assistência Social e Cidadania — SUAS',
+            "{$orgName} — SUAS",
             $protocolo
         );
 
         $pdf->addHeading('1. Identificação do Beneficiário / Família Atendida', 1);
         $nomeTitular = $responsavel ? $responsavel->nomeCompleto : ($familia->codigo ?? 'Família Cadastrada');
         $cpfTitular = $responsavel && $responsavel->cpf ? SecurityHelper::maskCpf($responsavel->cpf) : 'Não informado';
-        $nisTitular = $responsavel && $responsavel->nis ? $responsavel->nis : 'Não informado';
+        $nisTitular = ($responsavel && property_exists($responsavel, 'nis') && !empty($responsavel->nis)) ? (string)$responsavel->nis : 'Não informado';
         $endereco = $familia ? sprintf('%s, %s - %s, %s/%s', $familia->logradouro, $familia->numero ?: 'S/N', $familia->bairro, $familia->municipio, $familia->uf) : 'Endereço não cadastrado';
 
         $pdf->addKeyValueGrid([
@@ -114,7 +119,7 @@ final class PdfService
         $pdf->addQrCodeValidation(
             $qrCode,
             $shortHash,
-            "gestaosocial.gov.br/validar/{$protocolo}"
+            "{$publicHost}/validar/beneficio/{$protocolo}"
         );
 
         $pdf->addSignatures(
@@ -155,15 +160,19 @@ final class PdfService
         $beneficios = $this->beneficioRepo->findAll(['familiaId' => $familiaId]);
 
         $protocolo = $familia->codigo ?: sprintf('FAM-%d', $familia->id);
-        $hashValidacao = hash('sha256', "PRONTUARIO:{$protocolo}:{$familiaId}");
-        $shortHash = strtoupper(substr($hashValidacao, 0, 16));
+        $payload = "PRONTUARIO:{$protocolo}:{$familiaId}";
+        $shortHash = SecurityHelper::signDocumentPayload($payload);
 
-        $qrCode = QrCode::create("https://gestaosocial.gov.br/validar/prontuario/{$protocolo}?h={$shortHash}");
+        $publicBase = rtrim((string)(Env::get('APP_PUBLIC_URL', 'http://localhost') ?: 'http://localhost'), '/');
+        $publicHost = parse_url($publicBase, PHP_URL_HOST) ?: 'localhost';
+        $unitName = (string)(Env::get('APP_UNIT_NAME', 'CRAS / Gestão Socioassistencial') ?: 'CRAS / Gestão Socioassistencial');
+
+        $qrCode = QrCode::create("{$publicBase}/validar/prontuario/{$protocolo}?h={$shortHash}");
 
         $pdf = Pdf::create("Prontuário Socioassistencial — {$protocolo}");
         $pdf->drawHeader(
             'PRONTUÁRIO SOCIOASSISTENCIAL COMPLETO',
-            'Centro de Referência de Assistência Social (CRAS) — Registro Unificado',
+            "{$unitName} — Registro Unificado",
             $protocolo
         );
 
@@ -247,14 +256,15 @@ final class PdfService
         $pdf->addQrCodeValidation(
             $qrCode,
             $shortHash,
-            "gestaosocial.gov.br/validar/{$protocolo}"
+            "{$publicHost}/validar/prontuario/{$protocolo}"
         );
 
+        $orgName = (string)(Env::get('APP_ORG_NAME', 'Secretaria Municipal de Assistência Social') ?: 'Secretaria Municipal de Assistência Social');
         $pdf->addSignatures(
             'Coordenação Técnica de Serviço Social',
             'Assistente Social Responsável — CRESS',
-            'Gestão Municipal de Assistência Social',
-            'Visto da Coordenação do CRAS'
+            $orgName,
+            "Visto da Coordenação ({$unitName})"
         );
 
         return $pdf;
@@ -273,15 +283,19 @@ final class PdfService
         $ano = date('Y', strtotime($doacao->dataRecebimento));
         $protocolo = sprintf('REC-DOA-%s-%04d', $ano, $doacao->id);
         $valorEstimado = (float)($doacao->valorEstimado ?? 0.0);
-        $hashValidacao = hash('sha256', "DOACAO:{$protocolo}:{$valorEstimado}:{$doacao->nomeDoador}");
-        $shortHash = strtoupper(substr($hashValidacao, 0, 16));
+        $payload = "DOACAO:{$protocolo}:{$valorEstimado}:{$doacao->nomeDoador}";
+        $shortHash = SecurityHelper::signDocumentPayload($payload);
 
-        $qrCode = QrCode::create("https://gestaosocial.gov.br/validar/doacao/{$protocolo}?h={$shortHash}");
+        $publicBase = rtrim((string)(Env::get('APP_PUBLIC_URL', 'http://localhost') ?: 'http://localhost'), '/');
+        $publicHost = parse_url($publicBase, PHP_URL_HOST) ?: 'localhost';
+        $orgName = (string)(Env::get('APP_ORG_NAME', 'Secretaria Municipal de Assistência Social') ?: 'Secretaria Municipal de Assistência Social');
+
+        $qrCode = QrCode::create("{$publicBase}/validar/doacao/{$protocolo}?h={$shortHash}");
 
         $pdf = Pdf::create("Recibo de Doação — {$protocolo}");
         $pdf->drawHeader(
             'RECIBO OFICIAL DE DOAÇÃO SOCIOASSISTENCIAL',
-            'Entidade Beneficente e Assistencial de Amparo Social',
+            "{$orgName} — Captação e Parcerias",
             $protocolo
         );
 
@@ -333,7 +347,7 @@ final class PdfService
         $pdf->addQrCodeValidation(
             $qrCode,
             $shortHash,
-            "gestaosocial.gov.br/validar/{$protocolo}"
+            "{$publicHost}/validar/doacao/{$protocolo}"
         );
 
         $pdf->addSignatures(
@@ -344,6 +358,107 @@ final class PdfService
         );
 
         return $pdf;
+    }
+
+    /**
+     * Valida publicamente a autenticidade de um documento oficial via protocolo e código HMAC.
+     * Não expõe dados pessoais ou sensíveis (LGPD).
+     */
+    public function verificarDocumentoPublico(string $tipo, string $codigo, string $hash): array
+    {
+        $tipo = mb_strtolower(trim($tipo), 'UTF-8');
+        $codigo = strtoupper(trim($codigo));
+        $hash = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $hash) ?? '');
+
+        $orgName = (string)(Env::get('APP_ORG_NAME', 'Secretaria Municipal de Assistência Social') ?: 'Secretaria Municipal de Assistência Social');
+
+        if ($codigo === '' || strlen($hash) < 16) {
+            return [
+                'valido' => false,
+                'motivo' => 'Informe o protocolo oficial e o código de verificação HMAC de 16 caracteres.',
+                'orgaoEmissor' => $orgName,
+            ];
+        }
+
+        if ($tipo === 'beneficio' && preg_match('/^BEN-\d{4}-(\d+)$/', $codigo, $m)) {
+            $beneficio = $this->beneficioRepo->findById((int)$m[1]);
+            if (!$beneficio) {
+                return ['valido' => false, 'motivo' => 'Protocolo de benefício não localizado.', 'orgaoEmissor' => $orgName];
+            }
+            $protocolo = sprintf('BEN-%s-%04d', date('Y', strtotime($beneficio->dataEntrega)), $beneficio->id);
+            $payload = "BENEFICIO:{$protocolo}:{$beneficio->dataEntrega}:{$beneficio->familiaId}";
+            if (!SecurityHelper::verifyDocumentSignature($payload, $hash)) {
+                return ['valido' => false, 'motivo' => 'Assinatura HMAC inválida ou documento adulterado.', 'orgaoEmissor' => $orgName];
+            }
+            return [
+                'valido' => true,
+                'tipoDocumento' => 'Termo de Concessão e Recebimento de Benefício',
+                'protocolo' => $protocolo,
+                'dataEmissao' => FormatHelper::date($beneficio->dataEntrega),
+                'orgaoEmissor' => $orgName,
+                'resumoPublico' => sprintf('Tipo: %s | Situação: %s | Itens: %d', $beneficio->tipoBeneficio, $beneficio->situacao, count($beneficio->itens)),
+            ];
+        }
+
+        if ($tipo === 'prontuario') {
+            $familia = null;
+            if (preg_match('/^FAM-(\d+)$/', $codigo, $m)) {
+                $familia = $this->familiaRepo->findById((int)$m[1]);
+            }
+            if (!$familia) {
+                $todas = $this->familiaRepo->findAll(['search' => $codigo]);
+                foreach ($todas as $f) {
+                    if (strtoupper($f->codigo) === $codigo) {
+                        $familia = $f;
+                        break;
+                    }
+                }
+            }
+            if (!$familia) {
+                return ['valido' => false, 'motivo' => 'Prontuário não localizado.', 'orgaoEmissor' => $orgName];
+            }
+            $protocolo = $familia->codigo ?: sprintf('FAM-%d', $familia->id);
+            $payload = "PRONTUARIO:{$protocolo}:{$familia->id}";
+            if (!SecurityHelper::verifyDocumentSignature($payload, $hash)) {
+                return ['valido' => false, 'motivo' => 'Assinatura HMAC inválida ou prontuário divergente.', 'orgaoEmissor' => $orgName];
+            }
+            return [
+                'valido' => true,
+                'tipoDocumento' => 'Prontuário Socioassistencial Familiar',
+                'protocolo' => $protocolo,
+                'dataEmissao' => FormatHelper::date($familia->dataCadastro ?? date('Y-m-d')),
+                'orgaoEmissor' => $orgName,
+                'resumoPublico' => sprintf('Situação Cadastral: %s | Município: %s/%s', $familia->situacaoCadastral, $familia->municipio, $familia->uf),
+            ];
+        }
+
+        if ($tipo === 'doacao' && preg_match('/^REC-DOA-\d{4}-(\d+)$/', $codigo, $m)) {
+            $doacao = $this->doacaoRepo->findById((int)$m[1]);
+            if (!$doacao) {
+                return ['valido' => false, 'motivo' => 'Recibo de doação não localizado.', 'orgaoEmissor' => $orgName];
+            }
+            $ano = date('Y', strtotime($doacao->dataRecebimento));
+            $protocolo = sprintf('REC-DOA-%s-%04d', $ano, $doacao->id);
+            $valorEstimado = (float)($doacao->valorEstimado ?? 0.0);
+            $payload = "DOACAO:{$protocolo}:{$valorEstimado}:{$doacao->nomeDoador}";
+            if (!SecurityHelper::verifyDocumentSignature($payload, $hash)) {
+                return ['valido' => false, 'motivo' => 'Assinatura HMAC inválida ou recibo adulterado.', 'orgaoEmissor' => $orgName];
+            }
+            return [
+                'valido' => true,
+                'tipoDocumento' => 'Recibo Oficial de Doação Socioassistencial',
+                'protocolo' => $protocolo,
+                'dataEmissao' => FormatHelper::date($doacao->dataRecebimento),
+                'orgaoEmissor' => $orgName,
+                'resumoPublico' => sprintf('Modalidade: %s | Valor Estimado: %s', $doacao->tipoDoacao, FormatHelper::currency($valorEstimado)),
+            ];
+        }
+
+        return [
+            'valido' => false,
+            'motivo' => 'Tipo ou formato de protocolo não reconhecido para verificação pública.',
+            'orgaoEmissor' => $orgName,
+        ];
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\AtendimentoService;
 use App\Services\FamiliaService;
 
@@ -27,9 +28,12 @@ final class AtendimentoController
         ];
 
         $atendimentos = $this->atendimentoService->listar($filters);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($atendimentos, $page, 15);
 
         return View::render('atendimentos/index', [
-            'atendimentos' => $atendimentos,
+            'atendimentos' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters
         ]);
     }
@@ -40,12 +44,17 @@ final class AtendimentoController
         $familias = $this->familiaService->listar();
         $familiaSelecionada = $familiaId > 0 ? $this->familiaService->obterPorId($familiaId) : null;
         $integrantes = $familiaId > 0 ? $this->familiaService->obterFichaCompleta($familiaId)['integrantes'] ?? [] : [];
+        $user = Session::get('user');
 
         return View::render('atendimentos/create', [
             'familias' => $familias,
             'familiaSelecionada' => $familiaSelecionada,
             'integrantes' => $integrantes,
-            'old' => Session::flash('old_input') ?? ['familiaId' => $familiaId, 'dataAtendimento' => date('Y-m-d')],
+            'old' => Session::flash('old_input') ?? [
+                'familiaId' => $familiaId,
+                'dataAtendimento' => date('Y-m-d'),
+                'profissionalResponsavel' => $user['nome'] ?? '',
+            ],
             'errors' => Session::flash('form_errors') ?? []
         ]);
     }

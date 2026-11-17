@@ -16,8 +16,14 @@ use App\Models\Familia;
   </div>
 
   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <a href="/beneficios/<?= $entrega->id ?>/termo-pdf?download=1" class="btn btn-primary btn-sm" target="_blank" title="Baixar Termo Oficial de Concessão em PDF">📄 Emitir Termo Oficial (PDF)</a>
-    <button type="button" onclick="document.getElementById('modal-notificacao-beneficio').style.display='flex'" class="btn btn-outline btn-sm">📲 Notificar WhatsApp</button>
+    <a href="/beneficios/<?= $entrega->id ?>/termo-pdf?download=1" class="btn btn-primary btn-sm" target="_blank" title="Baixar Termo Oficial de Concessão em PDF">
+      <?= \App\Helpers\IconHelper::svg('file-text', 14) ?>
+      <span>Emitir Termo Oficial (PDF)</span>
+    </a>
+    <button type="button" onclick="document.getElementById('modal-notificacao-beneficio').style.display='flex'" class="btn btn-outline btn-sm">
+      <?= \App\Helpers\IconHelper::svg('bell', 14) ?>
+      <span>Notificar Cidadão</span>
+    </button>
     <button onclick="window.print()" class="btn btn-outline btn-sm">Imprimir na Tela</button>
 
     <?php if ($entrega->situacao === 'Preparada'): ?>
@@ -130,7 +136,7 @@ use App\Models\Familia;
 <div id="modal-notificacao-beneficio" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
   <div style="background: #ffffff; width: 100%; max-width: 520px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden;">
     <div style="background: var(--primary); color: #ffffff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;">
-      <h3 style="font-size: 16px; font-weight: 700; margin: 0;">📲 Notificar Retirada de Benefício</h3>
+      <h3 style="font-size: 16px; font-weight: 700; margin: 0;">Notificar Retirada de Benefício</h3>
       <button type="button" onclick="document.getElementById('modal-notificacao-beneficio').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
     </div>
     <form action="/notificacoes/enviar" method="POST" style="padding: 20px;">

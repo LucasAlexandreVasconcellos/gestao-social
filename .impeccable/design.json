@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-17T14:38:00-03:00",
+  "title": "Design System: Gestão Social — Plataforma Socioassistencial SUAS",
+  "extensions": {
+    "colorMeta": {
+      "civic-rail": { "role": "navigation", "displayName": "Atlantic Rail", "canonical": "#0B2545" },
+      "primary": { "role": "primary", "displayName": "Civic Blue", "canonical": "#1351B4" },
+      "success": { "role": "semantic", "displayName": "Civic Emerald", "canonical": "#0E8A5D" },
+      "warning": { "role": "semantic", "displayName": "Amber Ochre", "canonical": "#B45309" },
+      "danger": { "role": "semantic", "displayName": "Civic Crimson", "canonical": "#C92A2A" },
+      "bg-body": { "role": "neutral", "displayName": "Alabaster Ground", "canonical": "#F4F6F9" },
+      "bg-card": { "role": "neutral", "displayName": "Crisp Surface", "canonical": "#FFFFFF" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Page Title", "purpose": "Títulos principais de módulo em .page-title" },
+      "body": { "displayName": "System Body", "purpose": "Formulários, tabelas operacionais e pareceres técnicos" },
+      "label": { "displayName": "Tabular Mono", "purpose": "Protocolos, CPFs, códigos HMAC e métricas numéricas" }
+    },
+    "shadows": [
+      { "name": "modal-elevation", "value": "0 22px 45px rgba(11, 37, 69, 0.22)", "purpose": "Apenas em modais sobrepostos e .auth-shell" },
+      { "name": "focus-ring", "value": "0 0 0 3px rgba(38, 112, 232, 0.25)", "purpose": "Anel de foco acessível em controles interativos" }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "600px" },
+      { "name": "tablet", "value": "960px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal de módulo ou envio de formulário institucional.",
+      "html": "<button class=\"ds-btn-primary\">Registrar Atendimento</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 8px 15px; font-family: 'Public Sans', sans-serif; font-size: 0.86rem; font-weight: 600; border-radius: 6px; border: 1px solid transparent; background: #1351B4; color: #FFFFFF; cursor: pointer; } .ds-btn-primary:hover { background: #0C3D8E; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(38, 112, 232, 0.25); }"
+    },
+    {
+      "name": "KPI Stat Tile",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Cartão de indicador gerencial com algarismo tabular e cápsula de ícone SVG.",
+      "html": "<div class=\"ds-stat\"><div class=\"ds-stat-top\"><span class=\"ds-stat-title\">Famílias Cadastradas</span></div><div class=\"ds-stat-val\">142</div></div>",
+      "css": ".ds-stat { background: #FFFFFF; border: 1px solid #DCE3EC; border-radius: 10px; padding: 18px 20px; } .ds-stat-title { font-size: 0.78rem; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em; } .ds-stat-val { font-size: 1.85rem; font-weight: 700; color: #0F1E36; font-variant-numeric: tabular-nums; margin-top: 8px; }"
+    },
+    {
+      "name": "Civic Progress Bar",
+      "kind": "custom",
+      "refersTo": "card-surface",
+      "description": "Barra proporcional horizontal para vigilância de vulnerabilidade e território.",
+      "html": "<div class=\"ds-track\"><div class=\"ds-fill\" style=\"width:62%\"></div></div>",
+      "css": ".ds-track { height: 10px; width: 100%; background: #EEF2F7; border-radius: 99px; overflow: hidden; } .ds-fill { height: 100%; border-radius: 99px; background: #1351B4; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Autoridade Cívica de Alta Legibilidade",
+    "overview": "O sistema visual Civic Moderno combina autoridade institucional Gov.br em azul atlântico e clareza operacional em superfície alabastro com delimitação por borda fina e algarismos tabulares.",
+    "keyCharacteristics": [
+      "Tipografia Public Sans + IBM Plex Mono com tabular-nums",
+      "Iconografia SVG uniforme 1.75px sem emojis Unicode",
+      "Zero tarjas laterais espessas em cards ou alertas"
+    ],
+    "rules": [
+      { "name": "The Civic Contrast Rule", "body": "Alertas e badges usam fundo suavizado com borda uniforme de 1px e texto de alto contraste.", "section": "colors" }
+    ],
+    "dos": [
+      "Do usar IconHelper::svg() para todos os ícones da interface.",
+      "Do aplicar tabular-nums em valores monetários, estoques e datas."
+    ],
+    "donts": [
+      "Don't usar emojis Unicode em navegação, botões ou tabelas.",
+      "Don't usar tarjas coloridas border-left > 1px em cards."
+    ]
+  }
+}
+

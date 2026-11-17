@@ -27,6 +27,8 @@ interface FamiliaRepositoryInterface
      */
     public function getIntegrantes(int $familiaId, bool $apenasAtivos = true): array;
 
+    public function findVinculoById(int $vinculoId): ?VinculoFamiliar;
+
     public function addIntegrante(VinculoFamiliar $vinculo): VinculoFamiliar;
 
     public function updateIntegrante(VinculoFamiliar $vinculo): bool;

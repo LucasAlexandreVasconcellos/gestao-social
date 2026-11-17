@@ -1,179 +1,248 @@
 <?php
-/** @var string $content */
-/** @var array|null $user */
-$currentUri = $_SERVER['REQUEST_URI'] ?? '/';
-$isActive = fn(string $path) => str_starts_with($currentUri, $path) ? 'active' : '';
+use App\Core\Session;
+use App\Helpers\CsrfHelper;
+use App\Helpers\IconHelper;
+
+$currentUri = strtok($_SERVER['REQUEST_URI'] ?? '/dashboard', '?');
+$currentUser = Session::get('user');
+$flashSuccess = Session::flash('success');
+$flashError = Session::flash('error');
+$flashInfo = Session::flash('info');
+
+$orgTitle = $orgName ?? 'Secretaria Municipal de Assistência Social';
+$unitTitle = $unitName ?? 'Gestão Socioassistencial — SUAS';
+
+$isActive = function (string $prefix) use ($currentUri): string {
+    if ($prefix === '/dashboard') {
+        return $currentUri === '/dashboard' ? 'active' : '';
+    }
+    return str_starts_with($currentUri, $prefix) ? 'active' : '';
+};
+
+$iniciais = 'US';
+if (!empty($currentUser['nome'])) {
+    $partes = preg_split('/\s+/', trim((string)$currentUser['nome']));
+    $iniciais = mb_strtoupper(mb_substr($partes[0] ?? 'U', 0, 1) . mb_substr($partes[1] ?? ($partes[0] ?? ''), 0, 1), 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestão Social e Assistencial</title>
+  <title><?= $e($pageTitle ?? 'Gestão Social — Plataforma Socioassistencial') ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/app.css">
-  <link rel="stylesheet" href="/assets/css/print.css" media="print">
-  <script>
-    try {
-      if (window.innerWidth > 900 && localStorage.getItem('sidebar_closed') === 'true') {
-        document.documentElement.classList.add('sidebar-closed');
-      }
-    } catch (e) {}
-  </script>
+  <link rel="stylesheet" href="/assets/css/print.css">
 </head>
 <body>
-  <div class="app-container" id="appContainer">
-    <!-- Sidebar Institucional -->
-    <aside class="app-sidebar" id="appSidebar" aria-label="Menu principal">
-      <div class="sidebar-brand">
-        <div class="sidebar-brand-title">
-          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          <span>Gestão Social</span>
-        </div>
-        <button id="sidebar-close" class="sidebar-close-btn" aria-label="Fechar menu" title="Fechar menu lateral">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
+<div class="app-wrapper app-container">
+  <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
-      <nav class="sidebar-menu">
-        <div class="menu-category">Geral</div>
-        <a href="/dashboard" class="nav-link <?= $isActive('/dashboard') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+  <!-- Botão único fixo no canto superior esquerdo: ancora a marca e recolhe/expande a barra lateral -->
+  <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle" title="Recolher ou expandir menu lateral" aria-label="Recolher ou expandir menu lateral" aria-expanded="true">
+    <span class="sidebar-toggle-mark">
+      <?= IconHelper::svg('building', 19) ?>
+    </span>
+    <span class="sidebar-toggle-hint" aria-hidden="true">
+      <span class="sidebar-toggle-arrow"><?= IconHelper::svg('chevrons-left', 14) ?></span>
+      <span class="hint-label-close">Recolher</span>
+      <span class="hint-label-open">Abrir menu</span>
+    </span>
+  </button>
+
+  <aside class="app-sidebar" id="app-sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-title">Gestão Social</span>
+        <span class="sidebar-brand-sub" title="<?= $e($unitTitle) ?>"><?= $e($unitTitle) ?></span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Menu principal">
+      <?php if ($can('dashboard.view')): ?>
+        <a href="/dashboard" class="sidebar-link <?= $isActive('/dashboard') ?>">
+          <?= IconHelper::svg('dashboard', 17) ?>
           <span>Painel Gerencial</span>
         </a>
+      <?php endif; ?>
 
-        <div class="menu-category">Atendimento & Famílias</div>
-        <a href="/familias" class="nav-link <?= $isActive('/familias') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+      <?php if ($can('familias.view') || $can('pessoas.view') || $can('avaliacoes.view') || $can('atendimentos.view')): ?>
+        <div class="sidebar-section-label">Atendimento & Cadastro</div>
+      <?php endif; ?>
+
+      <?php if ($can('familias.view')): ?>
+        <a href="/familias" class="sidebar-link <?= $isActive('/familias') ?>">
+          <?= IconHelper::svg('home', 17) ?>
           <span>Famílias</span>
         </a>
-        <a href="/pessoas" class="nav-link <?= $isActive('/pessoas') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      <?php endif; ?>
+
+      <?php if ($can('pessoas.view')): ?>
+        <a href="/pessoas" class="sidebar-link <?= $isActive('/pessoas') ?>">
+          <?= IconHelper::svg('users', 17) ?>
           <span>Pessoas / Integrantes</span>
         </a>
-        <a href="/avaliacoes" class="nav-link <?= $isActive('/avaliacoes') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          <span>Avaliações Sociais</span>
-        </a>
-        <a href="/atendimentos" class="nav-link <?= $isActive('/atendimentos') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          <span>Atendimentos & Visitas</span>
-        </a>
+      <?php endif; ?>
 
-        <div class="menu-category">Benefícios & Recursos</div>
-        <a href="/beneficios" class="nav-link <?= $isActive('/beneficios') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect width="20" height="5" x="2" y="7"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>
-          <span>Entregas de Benefícios</span>
+      <?php if ($can('avaliacoes.view')): ?>
+        <a href="/avaliacoes" class="sidebar-link <?= $isActive('/avaliacoes') ?>">
+          <?= IconHelper::svg('clipboard', 17) ?>
+          <span>Avaliação Social</span>
         </a>
-        <a href="/estoque" class="nav-link <?= $isActive('/estoque') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
-          <span>Estoque & Produtos</span>
-        </a>
-        <a href="/doacoes" class="nav-link <?= $isActive('/doacoes') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
-          <span>Doações Recebidas</span>
-        </a>
+      <?php endif; ?>
 
-        <div class="menu-category">Projetos & Análises</div>
-        <a href="/projetos" class="nav-link <?= $isActive('/projetos') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
-          <span>Projetos & Campanhas</span>
+      <?php if ($can('atendimentos.view')): ?>
+        <a href="/atendimentos" class="sidebar-link <?= $isActive('/atendimentos') ?>">
+          <?= IconHelper::svg('activity', 17) ?>
+          <span>Atendimentos</span>
         </a>
-        <a href="/relatorios" class="nav-link <?= $isActive('/relatorios') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-          <span>Relatórios Gerenciais</span>
-        </a>
-        <a href="/notificacoes/historico" class="nav-link <?= $isActive('/notificacoes/historico') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M12 7v4"></path><path d="M12 15h.01"></path></svg>
-          <span>Notificações & WhatsApp</span>
-        </a>
+      <?php endif; ?>
 
-        <div class="menu-category">Segurança & Governança</div>
-        <a href="/usuarios" class="nav-link <?= $isActive('/usuarios') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-          <span>Controle de Acesso</span>
+      <?php if ($can('beneficios.view') || $can('estoque.view') || $can('doacoes.view') || $can('projetos.view')): ?>
+        <div class="sidebar-section-label">Operação & Logística</div>
+      <?php endif; ?>
+
+      <?php if ($can('beneficios.view')): ?>
+        <a href="/beneficios" class="sidebar-link <?= $isActive('/beneficios') ?>">
+          <?= IconHelper::svg('gift', 17) ?>
+          <span>Entrega de Benefícios</span>
         </a>
-        <a href="/auditoria" class="nav-link <?= $isActive('/auditoria') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      <?php endif; ?>
+
+      <?php if ($can('estoque.view')): ?>
+        <a href="/estoque" class="sidebar-link <?= $isActive('/estoque') ?>">
+          <?= IconHelper::svg('box', 17) ?>
+          <span>Estoque e Produtos</span>
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('doacoes.view')): ?>
+        <a href="/doacoes" class="sidebar-link <?= $isActive('/doacoes') ?>">
+          <?= IconHelper::svg('heart', 17) ?>
+          <span>Doações</span>
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('projetos.view')): ?>
+        <a href="/projetos" class="sidebar-link <?= $isActive('/projetos') ?>">
+          <?= IconHelper::svg('calendar', 17) ?>
+          <span>Campanhas e Projetos</span>
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('relatorios.view') || $can('notificacoes.view') || $can('usuarios.view') || $can('auditoria.view') || $can('lgpd.manage')): ?>
+        <div class="sidebar-section-label">Governança & Controle</div>
+      <?php endif; ?>
+
+      <?php if ($can('relatorios.view')): ?>
+        <a href="/relatorios" class="sidebar-link <?= $isActive('/relatorios') ?>">
+          <?= IconHelper::svg('bar-chart', 17) ?>
+          <span>Relatórios & BI</span>
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('notificacoes.view')): ?>
+        <a href="/notificacoes/historico" class="sidebar-link <?= $isActive('/notificacoes') ?>">
+          <?= IconHelper::svg('bell', 17) ?>
+          <span>Comunicações</span>
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('usuarios.view')): ?>
+        <a href="/usuarios" class="sidebar-link <?= $isActive('/usuarios') ?>">
+          <?= IconHelper::svg('lock', 17) ?>
+          <span>Usuários e Perfis</span>
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('auditoria.view')): ?>
+        <a href="/auditoria" class="sidebar-link <?= $currentUri === '/auditoria' ? 'active' : '' ?>">
+          <?= IconHelper::svg('file-text', 17) ?>
           <span>Trilha de Auditoria</span>
         </a>
-        <a href="/meu-perfil/2fa" class="nav-link <?= $isActive('/meu-perfil/2fa') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-          <span>Proteção 2FA</span>
-        </a>
-        <a href="/auditoria/lgpd" class="nav-link <?= $isActive('/auditoria/lgpd') ?>">
-          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+      <?php endif; ?>
+
+      <?php if ($can('lgpd.manage')): ?>
+        <a href="/auditoria/lgpd" class="sidebar-link <?= str_starts_with($currentUri, '/auditoria/lgpd') ? 'active' : '' ?>">
+          <?= IconHelper::svg('shield-check', 17) ?>
           <span>Governança LGPD</span>
         </a>
-      </nav>
+      <?php endif; ?>
+    </nav>
 
-      <div class="sidebar-footer">
-        <div>Entidade Assistencial</div>
-        <div style="font-size: 11px; opacity: 0.7;">Versão 1.0 (Arquitetura PHP)</div>
-      </div>
-    </aside>
-
-    <!-- Overlay / Backdrop para fechamento no mobile -->
-    <div id="sidebar-backdrop" class="sidebar-backdrop" aria-hidden="true"></div>
-
-    <!-- Área Principal -->
-    <div class="app-main">
-      <!-- Topbar Header -->
-      <header class="app-header no-print">
-        <div class="header-title">
-          <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Alternar barra lateral" title="Alternar barra lateral" aria-expanded="true">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
-          <h1>Sistema de Gestão Social e Assistencial</h1>
-        </div>
-
-        <div class="header-actions">
-          <div style="font-size: 13px; text-align: right;">
-            <div style="font-weight: 600; color: var(--text-main);"><?= htmlspecialchars($user['nome'] ?? 'Usuário', ENT_QUOTES, 'UTF-8') ?></div>
-            <div style="font-size: 11px; color: var(--text-muted);"><?= htmlspecialchars($user['perfil'] ?? 'Perfil', ENT_QUOTES, 'UTF-8') ?></div>
-          </div>
-
-          <a href="/logout" class="btn btn-secondary btn-sm" title="Sair do sistema">Sair</a>
-        </div>
-      </header>
-
-      <!-- Área de Conteúdo -->
-      <main class="app-content">
-        <!-- Mensagens Flash -->
-        <?php if (\App\Core\Session::hasFlash('success')): ?>
-          <div class="alert alert-success">
-            <span><?= htmlspecialchars(\App\Core\Session::flash('success'), ENT_QUOTES, 'UTF-8') ?></span>
-          </div>
-        <?php endif; ?>
-
-        <?php if (\App\Core\Session::hasFlash('error')): ?>
-          <div class="alert alert-danger">
-            <span><?= htmlspecialchars(\App\Core\Session::flash('error'), ENT_QUOTES, 'UTF-8') ?></span>
-          </div>
-        <?php endif; ?>
-
-        <?php if (\App\Core\Session::hasFlash('warning')): ?>
-          <div class="alert alert-warning">
-            <span><?= htmlspecialchars(\App\Core\Session::flash('warning'), ENT_QUOTES, 'UTF-8') ?></span>
-          </div>
-        <?php endif; ?>
-
-        <?php if (\App\Core\Session::hasFlash('info')): ?>
-          <div class="alert alert-info">
-            <span><?= htmlspecialchars(\App\Core\Session::flash('info'), ENT_QUOTES, 'UTF-8') ?></span>
-          </div>
-        <?php endif; ?>
-
-        <!-- Conteúdo do Template Filho -->
-        <?= $content ?>
-      </main>
+    <div class="sidebar-footer">
+      <a href="/meu-perfil/senha" class="sidebar-user-link">
+        <?= IconHelper::svg('key', 15) ?>
+        <span>Alterar Minha Senha</span>
+      </a>
+      <a href="/meu-perfil/2fa" class="sidebar-user-link">
+        <?= IconHelper::svg('shield', 15) ?>
+        <span>Segurança 2FA</span>
+      </a>
+      <a href="/validar" class="sidebar-user-link">
+        <?= IconHelper::svg('qr-code', 15) ?>
+        <span>Validador QR Público</span>
+      </a>
     </div>
-  </div>
+  </aside>
 
-  <script src="/assets/js/app.js"></script>
+  <div class="app-main">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-org-meta">
+          <span class="header-org-name"><?= $e($orgTitle) ?></span>
+          <span class="header-org-unit"><?= $e($unitTitle) ?></span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <?php if ($currentUser): ?>
+          <div class="user-pill">
+            <span class="user-avatar-chip"><?= $e($iniciais) ?></span>
+            <span><?= $e($currentUser['nome']) ?></span>
+            <span class="user-role-tag"><?= $e($currentUser['perfil']) ?></span>
+          </div>
+          <form method="POST" action="/logout" style="display:inline;">
+            <?= CsrfHelper::input() ?>
+            <button type="submit" class="btn btn-secondary btn-sm" title="Encerrar sessão">
+              <?= IconHelper::svg('log-out', 15) ?>
+              <span>Sair</span>
+            </button>
+          </form>
+        <?php endif; ?>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <?php if ($flashSuccess): ?>
+        <div class="alert alert-success" role="status">
+          <?= IconHelper::svg('check-circle', 18) ?>
+          <div><?= $e($flashSuccess) ?></div>
+        </div>
+      <?php endif; ?>
+
+      <?php if ($flashError): ?>
+        <div class="alert alert-danger" role="alert">
+          <?= IconHelper::svg('x-circle', 18) ?>
+          <div><?= $e($flashError) ?></div>
+        </div>
+      <?php endif; ?>
+
+      <?php if ($flashInfo): ?>
+        <div class="alert alert-info" role="status">
+          <?= IconHelper::svg('info', 18) ?>
+          <div><?= $e($flashInfo) ?></div>
+        </div>
+      <?php endif; ?>
+
+      <?= $content ?>
+    </main>
+  </div>
+</div>
+
+<script src="/assets/js/app.js"></script>
 </body>
 </html>

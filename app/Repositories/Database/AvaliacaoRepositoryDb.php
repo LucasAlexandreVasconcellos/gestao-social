@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\AvaliacaoRepositoryInterface;
 use App\Core\Database;
+use App\Core\Session;
 use App\Models\AvaliacaoSocial;
 use PDO;
 
@@ -96,13 +97,15 @@ final class AvaliacaoRepositoryDb implements AvaliacaoRepositoryInterface
         $sql = "INSERT INTO gestao_social.avaliacoes_sociais (
                     familia_id, responsavel_id, data_avaliacao, renda_familiar_declarada,
                     renda_per_capita, quantidade_integrantes, condicao_moradia,
-                    situacao_alimentar, situacao_emprego, necessita_acompanhamento,
-                    classificacao, parecer_social, data_reavaliacao
+                    situacao_alimentar, situacao_emprego, tem_criancas, tem_idosos, tem_pcd,
+                    necessita_acompanhamento, classificacao, justificativa_classificacao,
+                    necessidades_prioritarias, parecer_social, data_reavaliacao
                 ) VALUES (
                     :familia_id, :responsavel_id, :data_avaliacao, :renda_declarada,
                     :renda_per_capita, :integrantes, :moradia,
-                    :alimentar, :emprego, :acompanhamento,
-                    :classificacao, :parecer, :reavaliacao
+                    :alimentar, :emprego, :tem_criancas, :tem_idosos, :tem_pcd,
+                    :acompanhamento, :classificacao, :justificativa,
+                    CAST(:necessidades AS JSONB), :parecer, :reavaliacao
                 ) RETURNING id, data_avaliacao, renda_per_capita";
 
         $stmt = $this->db->prepare($sql);
@@ -116,8 +119,13 @@ final class AvaliacaoRepositoryDb implements AvaliacaoRepositoryInterface
             'moradia' => $avaliacao->condicoesMoradia,
             'alimentar' => $avaliacao->situacaoAlimentar,
             'emprego' => $avaliacao->situacaoEmprego,
+            'tem_criancas' => $avaliacao->temCriancas ? 'true' : 'false',
+            'tem_idosos' => $avaliacao->temIdosos ? 'true' : 'false',
+            'tem_pcd' => $avaliacao->temPcd ? 'true' : 'false',
             'acompanhamento' => $avaliacao->necessidadeAcompanhamento ? 'true' : 'false',
             'classificacao' => $this->normalizeNivel($avaliacao->nivelVulnerabilidade),
+            'justificativa' => $avaliacao->justificativaClassificacao,
+            'necessidades' => json_encode(array_values($avaliacao->necessidadesIdentificadas), JSON_UNESCAPED_UNICODE),
             'parecer' => $avaliacao->parecerSocial,
             'reavaliacao' => $avaliacao->dataPrevistaReavaliacao ?: null,
         ]);
@@ -156,6 +164,16 @@ final class AvaliacaoRepositoryDb implements AvaliacaoRepositoryInterface
 
     private function mapRowToModel(array $row): AvaliacaoSocial
     {
+        $necessidades = [];
+        if (!empty($row['necessidades_prioritarias'])) {
+            $decoded = is_array($row['necessidades_prioritarias'])
+                ? $row['necessidades_prioritarias']
+                : json_decode((string)$row['necessidades_prioritarias'], true);
+            if (is_array($decoded)) {
+                $necessidades = $decoded;
+            }
+        }
+
         return new AvaliacaoSocial(
             (int)$row['id'],
             (int)$row['familia_id'],
@@ -167,15 +185,15 @@ final class AvaliacaoRepositoryDb implements AvaliacaoRepositoryInterface
             $row['condicao_moradia'] ?? 'Regular',
             $row['situacao_alimentar'] ?? 'Segura',
             $row['situacao_emprego'] ?? 'Renda estável',
-            false,
-            false,
-            false,
-            ['alimentacao', 'habitacao'],
+            (bool)($row['tem_criancas'] ?? false),
+            (bool)($row['tem_idosos'] ?? false),
+            (bool)($row['tem_pcd'] ?? false),
+            $necessidades,
             (bool)($row['necessita_acompanhamento'] ?? true),
             $row['classificacao'] ?? 'Média',
-            'Classificação fundamentada no parecer socioassistencial',
+            $row['justificativa_classificacao'] ?? 'Classificação fundamentada no parecer socioassistencial',
             $row['parecer_social'] ?? '',
-            $row['data_reavaliacao']
+            $row['data_reavaliacao'] ? substr((string)$row['data_reavaliacao'], 0, 10) : null
         );
     }
 
@@ -192,24 +210,29 @@ final class AvaliacaoRepositoryDb implements AvaliacaoRepositoryInterface
 
     private function resolveResponsavelId(string $nomeOuIdentificador): int
     {
-        // 1. Tenta buscar usuário por nome ou login
-        $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
-        $stmt->execute([
-            'busca' => '%' . mb_strtolower(trim($nomeOuIdentificador), 'UTF-8') . '%',
-            'login' => mb_strtolower(trim($nomeOuIdentificador), 'UTF-8')
-        ]);
-        $id = $stmt->fetchColumn();
-
-        if ($id) {
-            return (int)$id;
+        $busca = mb_strtolower(trim($nomeOuIdentificador), 'UTF-8');
+        if ($busca !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
+            $stmt->execute([
+                'busca' => '%' . $busca . '%',
+                'login' => $busca
+            ]);
+            $id = $stmt->fetchColumn();
+            if ($id) {
+                return (int)$id;
+            }
         }
 
-        // 2. Se não encontrar, busca o primeiro assistente social ou administrador
+        $sessionUser = Session::get('user');
+        if (!empty($sessionUser['id'])) {
+            return (int)$sessionUser['id'];
+        }
+
         $stmtDefault = $this->db->query("
             SELECT u.id 
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE p.nome IN ('Assistente Social', 'Administrador', 'Coordenação')
+             WHERE u.ativo = TRUE AND p.nome IN ('Assistente Social', 'Administrador', 'Coordenação')
              ORDER BY u.id ASC
              LIMIT 1
         ");

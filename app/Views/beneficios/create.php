@@ -61,7 +61,7 @@ use App\Models\ProjetoSocial;
 
         <div class="form-group col-4">
           <label class="form-label" for="responsavelDistribuicao">Responsável pela Distribuição <span class="required">*</span></label>
-          <input type="text" id="responsavelDistribuicao" name="responsavelDistribuicao" class="form-control" required placeholder="Nome do almoxarife ou técnico" value="<?= htmlspecialchars($old['responsavelDistribuicao'] ?? 'Robson Almoxarife', ENT_QUOTES, 'UTF-8') ?>">
+          <input type="text" id="responsavelDistribuicao" name="responsavelDistribuicao" class="form-control" required placeholder="Nome do almoxarife ou técnico" value="<?= htmlspecialchars($old['responsavelDistribuicao'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
         </div>
 
         <div class="form-group col-4">

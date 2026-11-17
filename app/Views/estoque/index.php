@@ -108,4 +108,5 @@ use App\Helpers\FormatHelper;
       </tbody>
     </table>
   </div>
+  <?= \App\Core\View::renderPartial('partials/pagination', ['pagination' => $pagination ?? null, 'basePath' => '/estoque', 'query' => ['search' => $filters['search'] ?? null, 'categoria' => $filters['categoria'] ?? null, 'baixo' => !empty($filters['estoqueBaixo']) ? '1' : null]]) ?>
 </div>

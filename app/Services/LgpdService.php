@@ -30,9 +30,8 @@ final class LgpdService
         }
 
         $protocolo = 'LGPD-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
-        $nomeOriginal = $pessoa->nomeCompleto;
 
-        // 1. Expurgar documentos anexos se solicitado
+        // 1. Expurgar documentos anexos vinculados à pessoa se solicitado
         $docsExcluidos = 0;
         if ($expurgarDocumentos) {
             $docs = $this->documentoRepo->findByEntidade('pessoa', $pessoaId);
@@ -47,7 +46,16 @@ final class LgpdService
             }
         }
 
-        // 2. Anonimização estrita dos campos identificadores (Art. 18 LGPD)
+        // 2. Descobre vínculos familiares antes de limpar para atualizar referências caso aplicável
+        $vinculos = $this->pessoaRepo->getHistoricoVinculosFamiliares($pessoaId);
+        $familiaIdsResp = [];
+        foreach ($vinculos as $v) {
+            if ($v->isResponsavel) {
+                $familiaIdsResp[] = $v->familiaId;
+            }
+        }
+
+        // 3. Anonimização estrita dos campos identificadores (Art. 18 LGPD)
         $pessoa->nomeCompleto = "Cidadão Anonimizado ({$protocolo})";
         $pessoa->nomeSocial = null;
         $pessoa->cpf = null;
@@ -64,7 +72,38 @@ final class LgpdService
 
         $this->pessoaRepo->update($pessoa);
 
-        // 3. Registrar a solicitação na trilha LGPD
+        // 4. Anonimiza referências derivadas em famílias e notificações no banco conectado
+        if (Database::isConnected()) {
+            try {
+                $db = Database::getConnection();
+                foreach ($familiaIdsResp as $famId) {
+                    $stmtFam = $db->prepare("
+                        UPDATE gestao_social.familias
+                           SET nome_referencia = :anon_nome
+                         WHERE id = :fam_id
+                    ");
+                    $stmtFam->execute([
+                        'anon_nome' => "Titular Anonimizado ({$protocolo})",
+                        'fam_id' => $famId,
+                    ]);
+                }
+
+                $stmtNotif = $db->prepare("
+                    UPDATE gestao_social.notificacoes
+                       SET destinatario_nome = :anon_nome,
+                           destinatario_contato = 'ANONIMIZADO'
+                     WHERE entidade_tipo = 'pessoa' AND entidade_id = :pessoa_id
+                ");
+                $stmtNotif->execute([
+                    'anon_nome' => "Titular Anonimizado ({$protocolo})",
+                    'pessoa_id' => $pessoaId,
+                ]);
+            } catch (\Throwable) {
+                // Silencioso caso tabela auxiliar não exista em ambiente parcial
+            }
+        }
+
+        // 5. Registrar a solicitação na trilha LGPD
         $registro = [
             'protocolo' => $protocolo,
             'pessoa_id' => $pessoaId,
@@ -87,7 +126,6 @@ final class LgpdService
                 ");
                 $stmt->execute($registro);
             } catch (\Throwable) {
-                // Fallback em sessão se a tabela ainda não estiver criada
                 $solicitacoes = Session::get(self::SESSION_KEY, []);
                 $solicitacoes[] = $registro;
                 Session::set(self::SESSION_KEY, $solicitacoes);
@@ -98,12 +136,12 @@ final class LgpdService
             Session::set(self::SESSION_KEY, $solicitacoes);
         }
 
-        // 4. Registro na auditoria geral
+        // 6. Auditoria sem vazar o nome original do titular após o expurgo
         $this->auditLog->log(
             'Anonimização de Titular (LGPD Art. 18)',
             'Pessoa',
             $pessoaId,
-            "Dados de '{$nomeOriginal}' anonimizados permanentemente sob o protocolo {$protocolo}. Motivo: {$motivo}."
+            "Titular #{$pessoaId} anonimizado permanentemente sob o protocolo {$protocolo}. Documentos expurgados: {$docsExcluidos}. Motivo: {$motivo}."
         );
 
         return [
@@ -119,31 +157,51 @@ final class LgpdService
         $inativos = [];
 
         $todas = $this->pessoaRepo->findAll();
+        $atendimentos = $this->atendimentoRepo->findAll();
+
+        $ultimoPorPessoa = [];
+        $ultimoPorFamilia = [];
+        foreach ($atendimentos as $at) {
+            $dataAt = substr((string)$at->dataAtendimento, 0, 10);
+            if (!empty($at->pessoaId)) {
+                $pid = (int)$at->pessoaId;
+                if (!isset($ultimoPorPessoa[$pid]) || $dataAt > $ultimoPorPessoa[$pid]) {
+                    $ultimoPorPessoa[$pid] = $dataAt;
+                }
+            }
+            if (!empty($at->familiaId)) {
+                $fid = (int)$at->familiaId;
+                if (!isset($ultimoPorFamilia[$fid]) || $dataAt > $ultimoPorFamilia[$fid]) {
+                    $ultimoPorFamilia[$fid] = $dataAt;
+                }
+            }
+        }
+
         foreach ($todas as $p) {
-            // Ignorar já anonimizados
             if (str_contains($p->nomeCompleto, 'Anonimizado')) {
                 continue;
             }
 
-            // Verifica se tem atendimentos
-            $atendimentos = $this->atendimentoRepo->findAll();
-            $ultimoAtendimento = null;
-            foreach ($atendimentos as $at) {
-                // Se vinculado a atendimento
-                if (isset($at->pessoaId) && (int)$at->pessoaId === $p->id) {
-                    if (!$ultimoAtendimento || $at->dataAtendimento > $ultimoAtendimento) {
-                        $ultimoAtendimento = $at->dataAtendimento;
-                    }
+            $ultimoAtendimento = $ultimoPorPessoa[$p->id] ?? null;
+
+            // Considera atendimentos da(s) família(s) às quais a pessoa pertence
+            $vinculos = $this->pessoaRepo->getHistoricoVinculosFamiliares($p->id);
+            foreach ($vinculos as $v) {
+                $dataFam = $ultimoPorFamilia[$v->familiaId] ?? null;
+                if ($dataFam && (!$ultimoAtendimento || $dataFam > $ultimoAtendimento)) {
+                    $ultimoAtendimento = $dataFam;
                 }
             }
 
-            // Se cadastro é antigo e sem atendimentos recentes
-            $dataBase = $ultimoAtendimento ?: $p->dataNascimento;
-            if ($dataBase && $dataBase < $limite) {
+            // Nunca usar data de nascimento como proxy de inatividade; usar última movimentação ou data de cadastro
+            $dataReferencia = $ultimoAtendimento ?: ($p->dataCadastro ?: null);
+            if ($dataReferencia && $dataReferencia < $limite) {
+                $ts = strtotime($dataReferencia);
+                $anosInativo = $ts ? (int)floor((time() - $ts) / (365 * 86400)) : $anos;
                 $inativos[] = [
                     'pessoa' => $p,
-                    'ultimoAcesso' => $ultimoAtendimento ?: 'Sem registros nos últimos ' . $anos . ' anos',
-                    'anosInativo' => $dataBase ? (int)((time() - strtotime($dataBase)) / (365 * 86400)) : $anos
+                    'ultimoAcesso' => $ultimoAtendimento ?: ('Cadastro em ' . date('d/m/Y', $ts ?: time())),
+                    'anosInativo' => max($anos, $anosInativo)
                 ];
             }
         }

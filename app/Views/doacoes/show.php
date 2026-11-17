@@ -14,7 +14,10 @@ use App\Models\Doacao;
   </div>
 
   <div style="display: flex; gap: 8px;">
-    <a href="/doacoes/<?= $doacao->id ?>/recibo-pdf?download=1" class="btn btn-primary btn-sm" target="_blank" title="Baixar Recibo Oficial de Doação em PDF">📄 Emitir Recibo Oficial (PDF)</a>
+    <a href="/doacoes/<?= $doacao->id ?>/recibo-pdf?download=1" class="btn btn-primary btn-sm" target="_blank" title="Baixar Recibo Oficial de Doação em PDF">
+      <?= \App\Helpers\IconHelper::svg('file-text', 14) ?>
+      <span>Emitir Recibo Oficial (PDF)</span>
+    </a>
     <button onclick="window.print()" class="btn btn-outline btn-sm">Imprimir na Tela</button>
   </div>
 </div>

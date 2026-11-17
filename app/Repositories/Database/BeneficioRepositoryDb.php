@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\BeneficioRepositoryInterface;
 use App\Core\Database;
+use App\Core\Session;
 use App\Models\BeneficioEntrega;
 use App\Models\ItemEntrega;
 use PDO;
@@ -99,42 +100,57 @@ final class BeneficioRepositoryDb implements BeneficioRepositoryInterface
         $initialStatus = 'Preparada';
         $finalStatus = $this->normalizeStatus($entrega->situacao);
 
-        $sql = "INSERT INTO gestao_social.entregas (
-                    familia_id, responsavel_id, acao_id, data_entrega,
-                    tipo_beneficio, status, comprovante, observacoes
-                ) VALUES (
-                    :familia_id, :responsavel_id, :acao_id, :data_entrega,
-                    :tipo, :status, :comprovante, :obs
-                ) RETURNING id";
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([
-            'familia_id' => $entrega->familiaId,
-            'responsavel_id' => $responsavelId,
-            'acao_id' => $entrega->campanhaId,
-            'data_entrega' => $entrega->dataEntrega ?: date('Y-m-d H:i:s'),
-            'tipo' => $this->normalizeTipo($entrega->tipoBeneficio),
-            'status' => $initialStatus,
-            'comprovante' => $entrega->comprovante,
-            'obs' => $entrega->observacoes,
-        ]);
-
-        $entrega->id = (int)$stmt->fetchColumn();
-
-        // Se houver itens já definidos no objeto, insere-os
-        if (!empty($entrega->itens)) {
-            foreach ($entrega->itens as $item) {
-                if ($item instanceof ItemEntrega) {
-                    $item->entregaId = $entrega->id;
-                    $this->addItem($item);
-                }
-            }
+        $startedTx = !$this->db->inTransaction();
+        if ($startedTx) {
+            $this->db->beginTransaction();
         }
 
-        // Se a situação desejada era 'Entregue' (Efetivada), atualiza para disparar o gatilho de baixa no estoque
-        if ($finalStatus === 'Entregue' && !empty($entrega->itens)) {
-            $this->updateStatus($entrega->id, 'Entregue');
-            $entrega->situacao = 'Efetivada';
+        try {
+            $sql = "INSERT INTO gestao_social.entregas (
+                        familia_id, responsavel_id, acao_id, data_entrega,
+                        tipo_beneficio, status, comprovante, observacoes
+                    ) VALUES (
+                        :familia_id, :responsavel_id, :acao_id, :data_entrega,
+                        :tipo, :status, :comprovante, :obs
+                    ) RETURNING id";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([
+                'familia_id' => $entrega->familiaId,
+                'responsavel_id' => $responsavelId,
+                'acao_id' => $entrega->campanhaId,
+                'data_entrega' => $entrega->dataEntrega ?: date('Y-m-d H:i:s'),
+                'tipo' => $this->normalizeTipo($entrega->tipoBeneficio),
+                'status' => $initialStatus,
+                'comprovante' => $entrega->comprovante,
+                'obs' => $entrega->observacoes,
+            ]);
+
+            $entrega->id = (int)$stmt->fetchColumn();
+
+            if (!empty($entrega->itens)) {
+                foreach ($entrega->itens as $item) {
+                    if ($item instanceof ItemEntrega) {
+                        $item->entregaId = $entrega->id;
+                        $this->addItem($item);
+                    }
+                }
+            }
+
+            // Atualiza status para disparar gatilho de baixa no estoque dentro da mesma transação
+            if ($finalStatus === 'Entregue' && !empty($entrega->itens)) {
+                $this->updateStatus($entrega->id, 'Entregue');
+                $entrega->situacao = 'Efetivada';
+            }
+
+            if ($startedTx && $this->db->inTransaction()) {
+                $this->db->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($startedTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
 
         return $entrega;
@@ -170,8 +186,16 @@ final class BeneficioRepositoryDb implements BeneficioRepositoryInterface
             $stmtLote->execute(['p_id' => $item->produtoId, 'lote' => $lote]);
             $validade = $stmtLote->fetchColumn() ?: null;
         } else {
-            // Busca o primeiro lote disponível pelo FEFO
-            $stmtFefo = $this->db->prepare("SELECT numero_lote, data_validade FROM gestao_social.lotes_produto WHERE produto_id = :p_id ORDER BY data_validade ASC NULLS LAST LIMIT 1");
+            // Busca lote válido não vencido com saldo positivo seguindo FEFO
+            $stmtFefo = $this->db->prepare("
+                SELECT numero_lote, data_validade
+                  FROM gestao_social.vw_saldo_lotes_vencimento
+                 WHERE produto_id = :p_id
+                   AND saldo_lote > 0
+                   AND (data_validade IS NULL OR data_validade >= CURRENT_DATE)
+                 ORDER BY data_validade ASC NULLS LAST
+                 LIMIT 1
+            ");
             $stmtFefo->execute(['p_id' => $item->produtoId]);
             $loteRow = $stmtFefo->fetch(PDO::FETCH_ASSOC);
             if ($loteRow) {
@@ -303,22 +327,29 @@ final class BeneficioRepositoryDb implements BeneficioRepositoryInterface
 
     private function resolveResponsavelId(string $nomeOuIdentificador): int
     {
-        $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
-        $stmt->execute([
-            'busca' => '%' . mb_strtolower(trim($nomeOuIdentificador), 'UTF-8') . '%',
-            'login' => mb_strtolower(trim($nomeOuIdentificador), 'UTF-8')
-        ]);
-        $id = $stmt->fetchColumn();
+        $busca = mb_strtolower(trim($nomeOuIdentificador), 'UTF-8');
+        if ($busca !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
+            $stmt->execute([
+                'busca' => '%' . $busca . '%',
+                'login' => $busca
+            ]);
+            $id = $stmt->fetchColumn();
+            if ($id) {
+                return (int)$id;
+            }
+        }
 
-        if ($id) {
-            return (int)$id;
+        $sessionUser = Session::get('user');
+        if (!empty($sessionUser['id'])) {
+            return (int)$sessionUser['id'];
         }
 
         $stmtDefault = $this->db->query("
             SELECT u.id 
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE p.nome IN ('Estoque', 'Assistente Social', 'Administrador')
+             WHERE u.ativo = TRUE AND p.nome IN ('Estoque', 'Assistente Social', 'Administrador')
              ORDER BY u.id ASC
              LIMIT 1
         ");

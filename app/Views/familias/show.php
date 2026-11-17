@@ -29,7 +29,10 @@ $rendaPerCapita = $qtdIntegrantesAtivos > 0 ? round($familia->rendaFamiliar / $q
   </div>
 
   <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <a href="/familias/<?= $familia->id ?>/prontuario-pdf?download=1" class="btn btn-outline btn-sm" target="_blank" title="Emitir Prontuário Socioassistencial Completo em PDF com QR Code">📄 Prontuário PDF</a>
+    <a href="/familias/<?= $familia->id ?>/prontuario-pdf?download=1" class="btn btn-outline btn-sm" target="_blank" title="Emitir Prontuário Socioassistencial Completo em PDF com QR Code">
+      <?= \App\Helpers\IconHelper::svg('file-text', 14) ?>
+      <span>Prontuário PDF</span>
+    </a>
     <a href="/avaliacoes/novo?familiaId=<?= $familia->id ?>" class="btn btn-primary btn-sm">+ Avaliação Social</a>
     <a href="/atendimentos/novo?familiaId=<?= $familia->id ?>" class="btn btn-secondary btn-sm">+ Atendimento</a>
     <a href="/beneficios/novo?familiaId=<?= $familia->id ?>" class="btn btn-secondary btn-sm">+ Entrega</a>
@@ -513,11 +516,11 @@ $rendaPerCapita = $qtdIntegrantesAtivos > 0 ? round($familia->rendaFamiliar / $q
                     <?= FormatHelper::datetime($doc->dataUpload) ?>
                   </td>
                   <td style="text-align: right; white-space: nowrap;">
-                    <a href="/documentos/<?= $doc->id ?>/download" class="btn btn-outline btn-sm" title="Download Seguro">⬇ Baixar</a>
+                    <a href="/documentos/<?= $doc->id ?>/download" class="btn btn-outline btn-sm" title="Download Seguro">Baixar</a>
                     <form action="/documentos/<?= $doc->id ?>/excluir" method="POST" style="display: inline;" data-confirm="Deseja realmente excluir permanentemente este documento? Esta ação será registrada na trilha de auditoria.">
                       <?= \App\Core\View::render('partials/csrf', [], null) ?>
                       <input type="hidden" name="redirect" value="/familias/<?= $familia->id ?>#documentos">
-                      <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); margin-left: 4px;" title="Excluir Anexo">🗑 Excluir</button>
+                      <button type="submit" class="btn btn-outline btn-sm" style="color: var(--danger); margin-left: 4px;" title="Excluir Anexo">Excluir</button>
                     </form>
                   </td>
                 </tr>

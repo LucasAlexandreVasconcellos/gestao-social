@@ -10,15 +10,14 @@ use RuntimeException;
 
 /**
  * Gerenciador Central de Conexão com Banco de Dados Relacional (PostgreSQL)
- * 
+ *
  * Implementa conexão segura via PDO com prepared statements obrigatórios,
- * controle transacional (ACID), injeção de contexto de auditoria de aplicação
+ * controle transacional (ACID), injeção de contexto de auditoria em nível de sessão
  * e proteção estrita contra vazamento de credenciais.
  */
 final class Database
 {
     private static ?PDO $instance = null;
-    private static bool $connectionAttempted = false;
     private static ?string $lastError = null;
 
     /**
@@ -32,18 +31,22 @@ final class Database
             return self::$instance;
         }
 
-        self::$connectionAttempted = true;
         $config = $customConfig ?? self::loadConfig();
 
-        $driver = $config['driver'] ?? 'pgsql';
-        $host = $config['host'] ?? '127.0.0.1';
+        $driver = (string)($config['driver'] ?? 'pgsql');
+        $host = (string)($config['host'] ?? '127.0.0.1');
         $port = (int)($config['port'] ?? 5432);
-        $dbname = $config['database'] ?? 'gestao_social';
-        $user = $config['username'] ?? 'postgres';
-        $pass = $config['password'] ?? '';
-        $schema = $config['schema'] ?? 'gestao_social';
-        $charset = $config['charset'] ?? 'utf8';
+        $dbname = (string)($config['database'] ?? 'gestao_social');
+        $user = (string)($config['username'] ?? 'gestao_app');
+        $pass = (string)($config['password'] ?? '');
+        $schema = (string)($config['schema'] ?? 'gestao_social');
+        $charset = (string)($config['charset'] ?? 'utf8');
         $timeout = (int)($config['timeout'] ?? 5);
+
+        // Proteção contra injeção no identificador de schema
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $schema)) {
+            throw new RuntimeException('Nome de schema de banco de dados inválido.');
+        }
 
         $dsn = "{$driver}:host={$host};port={$port};dbname={$dbname};options='--client_encoding={$charset}'";
 
@@ -56,18 +59,15 @@ final class Database
 
         try {
             $pdo = new PDO($dsn, $user, $pass, $options);
-            
-            // Configura o search_path para o schema oficial do sistema
-            $pdo->exec("SET search_path TO {$schema}, public");
-            
+            $pdo->exec("SET search_path TO \"{$schema}\", public");
+
             self::$instance = $pdo;
             self::$lastError = null;
             return self::$instance;
         } catch (PDOException $e) {
-            // Sanitiza mensagem para NUNCA vazar senha ou credenciais
             $sanitizedMessage = "Falha ao conectar com o banco de dados [{$driver}@{$host}:{$port}/{$dbname}].";
             self::$lastError = $sanitizedMessage;
-            self::logError($sanitizedMessage . " Detalhes: " . $e->getCode());
+            self::logError($sanitizedMessage . " Código SQLSTATE: " . $e->getCode());
             throw new RuntimeException($sanitizedMessage, (int)$e->getCode());
         }
     }
@@ -87,24 +87,21 @@ final class Database
     }
 
     /**
-     * Define o contexto do usuário logado na sessão PostgreSQL para auditoria LGPD automática.
-     * Os triggers 'trg_auditar_operacao' utilizam 'app.usuario_logado_id' e 'app.usuario_logado'.
+     * Define o contexto do usuário logado na sessão PostgreSQL (is_local = false para persistir em autocommit).
+     * As triggers 'trg_auditar_operacao' utilizam 'app.usuario_logado_id' e 'app.usuario_logado'.
      */
-    public static function setAuditContext(?int $usuarioId, ?string $login): void
+    public static function setAuditContext(?int $usuarioId, ?string $loginOrEmail): void
     {
         if (self::$instance === null) {
             return;
         }
 
         try {
-            if ($usuarioId !== null) {
-                $stmtId = self::$instance->prepare("SELECT set_config('app.usuario_logado_id', :id, true)");
-                $stmtId->execute(['id' => (string)$usuarioId]);
-            }
-            if (!empty($login)) {
-                $stmtUser = self::$instance->prepare("SELECT set_config('app.usuario_logado', :login, true)");
-                $stmtUser->execute(['login' => $login]);
-            }
+            $stmtId = self::$instance->prepare("SELECT set_config('app.usuario_logado_id', :id, false)");
+            $stmtId->execute(['id' => $usuarioId !== null ? (string)$usuarioId : '']);
+
+            $stmtUser = self::$instance->prepare("SELECT set_config('app.usuario_logado', :login, false)");
+            $stmtUser->execute(['login' => (string)($loginOrEmail ?? '')]);
         } catch (\Throwable $e) {
             self::logError("Falha ao configurar contexto de auditoria: " . $e->getMessage());
         }
@@ -148,7 +145,6 @@ final class Database
     public static function disconnect(): void
     {
         self::$instance = null;
-        self::$connectionAttempted = false;
         self::$lastError = null;
     }
 
@@ -170,13 +166,13 @@ final class Database
         }
 
         return [
-            'driver' => getenv('DB_CONNECTION') ?: 'pgsql',
-            'host' => getenv('DB_HOST') ?: '10.223.152.5',
-            'port' => (int)(getenv('DB_PORT') ?: 5432),
-            'database' => getenv('DB_DATABASE') ?: 'obras',
-            'username' => getenv('DB_USERNAME') ?: 'postgres',
-            'password' => getenv('DB_PASSWORD') ?: 'Sodf@1234',
-            'schema' => getenv('DB_SCHEMA') ?: 'gestao_social',
+            'driver' => Env::get('DB_CONNECTION', 'pgsql'),
+            'host' => Env::get('DB_HOST', '127.0.0.1'),
+            'port' => (int)Env::get('DB_PORT', 5432),
+            'database' => Env::get('DB_DATABASE', 'gestao_social'),
+            'username' => Env::get('DB_USERNAME', 'gestao_app'),
+            'password' => Env::get('DB_PASSWORD', ''),
+            'schema' => Env::get('DB_SCHEMA', 'gestao_social'),
             'charset' => 'utf8',
             'timeout' => 5,
         ];
@@ -187,7 +183,7 @@ final class Database
         $logFile = dirname(__DIR__, 2) . '/storage/logs/database.log';
         $logDir = dirname($logFile);
         if (!is_dir($logDir)) {
-            @mkdir($logDir, 0755, true);
+            @mkdir($logDir, 0750, true);
         }
         $timestamp = date('Y-m-d H:i:s');
         @file_put_contents($logFile, "[{$timestamp}] {$message}\n", FILE_APPEND);

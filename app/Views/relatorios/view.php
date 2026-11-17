@@ -46,7 +46,7 @@ $queryNominal = array_merge($filters ?? [], ['tipo' => $tipo, 'anonimizado' => 0
 </div>
 
 <!-- Barra de Governança LGPD e Alternância de Mascaramento -->
-<div class="card mb-4 no-print" style="background-color: var(--bg-surface); border-left: 4px solid var(--primary);">
+<div class="card mb-4 no-print" style="background-color: var(--bg-subtle);">
   <div style="padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
     <div style="display: flex; align-items: center; gap: 10px;">
       <div style="color: var(--primary);">
@@ -82,12 +82,14 @@ $queryNominal = array_merge($filters ?? [], ['tipo' => $tipo, 'anonimizado' => 0
             <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
             Anonimizado (Iniciais LGPD)
           </span>
-          <a href="/relatorios/visualizar?<?= http_build_query($queryNominal) ?>" class="btn btn-outline btn-sm" title="Exibir nomes completos (requer privilégio e registra na auditoria)" onclick="return confirm('ATENÇÃO: A exibição de dados nominais é auditada pelo sistema. Confirma a visualização dos nomes completos?');">
-            Ver Nomes Completos
-          </a>
+          <?php if ($can('relatorios.nominal')): ?>
+            <a href="/relatorios/visualizar?<?= http_build_query($queryNominal) ?>" class="btn btn-outline btn-sm" title="Exibir nomes completos (requer privilégio e registra na auditoria)" onclick="return confirm('ATENÇÃO: A exibição de dados nominais é auditada pelo sistema. Confirma a visualização dos nomes completos?');">
+              Ver Nomes Completos
+            </a>
+          <?php endif; ?>
         <?php else: ?>
           <span class="badge badge-warning" style="padding: 5px 10px;">
-            ⚠️ Nominal / Identificado
+            Nominal / Identificado
           </span>
           <a href="/relatorios/visualizar?<?= http_build_query($queryAnonimizado) ?>" class="btn btn-secondary btn-sm" title="Ocultar nomes pessoais para apresentações e relatórios externos">
             Ativar Mascaramento LGPD
@@ -292,7 +294,7 @@ $queryNominal = array_merge($filters ?? [], ['tipo' => $tipo, 'anonimizado' => 0
     </div>
   </div>
 
-  <div class="card mb-4" style="background-color: #f0fdf4; border-left: 4px solid var(--success);">
+  <div class="alert alert-success mb-4">
     <div style="padding: 14px 18px; display: flex; align-items: center; gap: 12px;">
       <div style="color: var(--success);">
         <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -438,9 +440,9 @@ $queryNominal = array_merge($filters ?? [], ['tipo' => $tipo, 'anonimizado' => 0
                   <td style="text-align: right; color: var(--text-muted);"><?= $p['estoqueMinimo'] ?></td>
                   <td>
                     <?php if ($p['statusEstoque'] === 'CRÍTICO'): ?>
-                      <span class="badge badge-danger">⚠️ Reposição Urgente</span>
+                      <span class="badge badge-danger">Reposição Urgente</span>
                     <?php else: ?>
-                      <span class="badge badge-success">✓ Normal</span>
+                      <span class="badge badge-success">Normal</span>
                     <?php endif; ?>
                   </td>
                   <td>

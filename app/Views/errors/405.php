@@ -1,11 +1,11 @@
 <?php
-/** @var string $allowed */
+use App\Helpers\IconHelper;
 ?>
 <div class="card">
   <div class="empty-state">
-    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-    <h2>405 — Método Não Permitido</h2>
-    <p style="margin: 8px 0 20px;">O método HTTP utilizado não é compatível com esta rota. Métodos permitidos: <code><?= htmlspecialchars($allowed ?? 'GET', ENT_QUOTES, 'UTF-8') ?></code></p>
+    <div class="empty-state-icon"><?= IconHelper::svg('alert-triangle', 24) ?></div>
+    <h4>405 — Método Não Permitido</h4>
+    <p class="mb-3">O método HTTP utilizado não é compatível com esta rota. Métodos permitidos: <span class="mono"><?= $e($allowed ?? 'GET') ?></span></p>
     <a href="/dashboard" class="btn btn-primary">Voltar ao Painel</a>
   </div>
 </div>

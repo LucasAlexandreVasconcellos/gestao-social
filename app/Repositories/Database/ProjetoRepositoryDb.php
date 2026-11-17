@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\ProjetoRepositoryInterface;
 use App\Core\Database;
+use App\Core\Session;
 use App\Models\ParticipanteProjeto;
 use App\Models\ProjetoSocial;
 use PDO;
@@ -155,24 +156,19 @@ final class ProjetoRepositoryDb implements ProjetoRepositoryInterface
 
     public function addParticipante(ParticipanteProjeto $participante): ParticipanteProjeto
     {
-        // Se familia_id não veio mas pessoa_id sim, tenta buscar a família da pessoa
-        $familiaId = $participante->familiaId;
+        // Se familia_id não veio mas pessoa_id sim, tenta buscar a família ativa da pessoa
+        $familiaId = $participante->familiaId ?: null;
         if (empty($familiaId) && !empty($participante->pessoaId)) {
             $stmtFam = $this->db->prepare("SELECT familia_id FROM gestao_social.familia_integrantes WHERE pessoa_id = :p_id ORDER BY id DESC LIMIT 1");
             $stmtFam->execute(['p_id' => $participante->pessoaId]);
-            $familiaId = $stmtFam->fetchColumn() ? (int)$stmtFam->fetchColumn() : null;
-        }
-
-        // Se ainda não tiver familia_id, vincula à primeira família ativa para satisfazer a FK NOT NULL
-        if (empty($familiaId)) {
-            $stmtFirst = $this->db->query("SELECT id FROM gestao_social.familias WHERE status = 'Ativa' LIMIT 1");
-            $familiaId = (int)($stmtFirst->fetchColumn() ?: 1);
+            $foundFam = $stmtFam->fetchColumn();
+            $familiaId = $foundFam !== false ? (int)$foundFam : null;
         }
 
         $sql = "INSERT INTO gestao_social.acao_beneficiarios (
-                    acao_id, familia_id, pessoa_id, data_participacao, situacao, observacoes
+                    acao_id, familia_id, pessoa_id, nome_participante, data_participacao, situacao, observacoes
                 ) VALUES (
-                    :acao_id, :familia_id, :pessoa_id, CURRENT_TIMESTAMP, :situacao, :obs
+                    :acao_id, :familia_id, :pessoa_id, :nome_participante, CURRENT_TIMESTAMP, :situacao, :obs
                 ) RETURNING id";
 
         $stmt = $this->db->prepare($sql);
@@ -180,11 +176,13 @@ final class ProjetoRepositoryDb implements ProjetoRepositoryInterface
             'acao_id' => $participante->projetoId,
             'familia_id' => $familiaId,
             'pessoa_id' => $participante->pessoaId ?: null,
+            'nome_participante' => $participante->nome !== '' ? $participante->nome : null,
             'situacao' => $this->normalizeParticipacao($participante->situacaoParticipacao),
             'obs' => $participante->observacoes,
         ]);
 
         $participante->id = (int)$stmt->fetchColumn();
+        $participante->familiaId = $familiaId;
         return $participante;
     }
 
@@ -201,6 +199,37 @@ final class ProjetoRepositoryDb implements ProjetoRepositoryInterface
             'situacao' => $this->normalizeParticipacao($participante->situacaoParticipacao),
             'obs' => $participante->observacoes,
         ]);
+    }
+
+    public function findParticipanteById(int $participanteId): ?ParticipanteProjeto
+    {
+        $sql = "SELECT ab.*,
+                       p.nome_completo AS pessoa_nome,
+                       f.nome_referencia AS familia_nome
+                  FROM gestao_social.acao_beneficiarios ab
+                  LEFT JOIN gestao_social.pessoas p ON p.id = ab.pessoa_id
+                  LEFT JOIN gestao_social.familias f ON f.id = ab.familia_id
+                 WHERE ab.id = :id";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['id' => $participanteId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return null;
+        }
+
+        $nome = $row['pessoa_nome'] ?? $row['familia_nome'] ?? $row['nome_participante'] ?? 'Participante';
+        return new ParticipanteProjeto(
+            (int)$row['id'],
+            (int)$row['acao_id'],
+            $row['familia_id'] !== null ? (int)$row['familia_id'] : null,
+            $row['pessoa_id'] !== null ? (int)$row['pessoa_id'] : null,
+            $nome,
+            $this->denormalizeParticipacao($row['situacao']),
+            $row['situacao'] === 'Atendido' ? substr((string)$row['data_participacao'], 0, 10) : null,
+            $row['observacoes']
+        );
     }
 
     public function getParticipantes(int $projetoId): array
@@ -220,7 +249,7 @@ final class ProjetoRepositoryDb implements ProjetoRepositoryInterface
 
         $participantes = [];
         foreach ($rows as $row) {
-            $nome = $row['pessoa_nome'] ?? $row['familia_nome'] ?? 'Participante';
+            $nome = $row['pessoa_nome'] ?? $row['familia_nome'] ?? $row['nome_participante'] ?? 'Participante';
             $situacao = $this->denormalizeParticipacao($row['situacao']);
 
             $participantes[] = new ParticipanteProjeto(
@@ -333,22 +362,29 @@ final class ProjetoRepositoryDb implements ProjetoRepositoryInterface
 
     private function resolveResponsavelId(string $nomeOuIdentificador): int
     {
-        $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
-        $stmt->execute([
-            'busca' => '%' . mb_strtolower(trim($nomeOuIdentificador), 'UTF-8') . '%',
-            'login' => mb_strtolower(trim($nomeOuIdentificador), 'UTF-8')
-        ]);
-        $id = $stmt->fetchColumn();
+        $busca = mb_strtolower(trim($nomeOuIdentificador), 'UTF-8');
+        if ($busca !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
+            $stmt->execute([
+                'busca' => '%' . $busca . '%',
+                'login' => $busca
+            ]);
+            $id = $stmt->fetchColumn();
+            if ($id) {
+                return (int)$id;
+            }
+        }
 
-        if ($id) {
-            return (int)$id;
+        $sessionUser = Session::get('user');
+        if (!empty($sessionUser['id'])) {
+            return (int)$sessionUser['id'];
         }
 
         $stmtDefault = $this->db->query("
             SELECT u.id 
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE p.nome IN ('Coordenação', 'Administrador')
+             WHERE u.ativo = TRUE AND p.nome IN ('Coordenação', 'Administrador')
              ORDER BY u.id ASC
              LIMIT 1
         ");

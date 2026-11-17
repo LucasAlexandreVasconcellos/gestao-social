@@ -172,6 +172,18 @@ final class FamiliaRepositoryDemo implements FamiliaRepositoryInterface
         return array_values($filtered);
     }
 
+    public function findVinculoById(int $vinculoId): ?VinculoFamiliar
+    {
+        $this->ensureSeedData();
+        $vinculos = Session::get(self::SESSION_VINCULOS_KEY, []);
+        foreach ($vinculos as $v) {
+            if ($v->id === $vinculoId) {
+                return $v;
+            }
+        }
+        return null;
+    }
+
     public function addIntegrante(VinculoFamiliar $vinculo): VinculoFamiliar
     {
         $vinculos = Session::get(self::SESSION_VINCULOS_KEY, []);

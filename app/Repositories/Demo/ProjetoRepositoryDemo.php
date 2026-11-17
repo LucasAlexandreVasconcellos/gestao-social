@@ -160,6 +160,17 @@ final class ProjetoRepositoryDemo implements ProjetoRepositoryInterface
         return false;
     }
 
+    public function findParticipanteById(int $participanteId): ?ParticipanteProjeto
+    {
+        $parts = Session::get(self::SESSION_PART_KEY, []);
+        foreach ($parts as $p) {
+            if ($p->id === $participanteId) {
+                return $p;
+            }
+        }
+        return null;
+    }
+
     public function getParticipantes(int $projetoId): array
     {
         $parts = Session::get(self::SESSION_PART_KEY, []);

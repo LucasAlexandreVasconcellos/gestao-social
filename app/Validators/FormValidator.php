@@ -104,13 +104,46 @@ final class FormValidator
             return $this;
         }
 
-        $clean = preg_replace('/\D/', '', $val);
-        if (strlen($clean) !== 11 || preg_match('/^(\d)\1{10}$/', $clean)) {
+        if (!self::isValidCpf($val)) {
             $this->errors[$field] = "O campo {$label} possui um CPF inválido.";
+        }
+
+        return $this;
+    }
+
+    public function cpfOrCnpj(string $field, string $label, bool $required = false): self
+    {
+        $val = trim((string)($this->data[$field] ?? ''));
+        if ($val === '') {
+            if ($required) {
+                $this->errors[$field] = "O campo {$label} é obrigatório.";
+            }
             return $this;
         }
 
-        // Validação dos dígitos verificadores do CPF
+        $clean = preg_replace('/\D/', '', $val);
+        if (strlen($clean) === 11) {
+            if (!self::isValidCpf($clean)) {
+                $this->errors[$field] = "O campo {$label} possui um CPF inválido.";
+            }
+        } elseif (strlen($clean) === 14) {
+            if (!self::isValidCnpj($clean)) {
+                $this->errors[$field] = "O campo {$label} possui um CNPJ inválido.";
+            }
+        } else {
+            $this->errors[$field] = "O campo {$label} deve conter um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.";
+        }
+
+        return $this;
+    }
+
+    public static function isValidCpf(string $val): bool
+    {
+        $clean = preg_replace('/\D/', '', $val);
+        if (strlen($clean) !== 11 || preg_match('/^(\d)\1{10}$/', $clean)) {
+            return false;
+        }
+
         for ($t = 9; $t < 11; $t++) {
             $d = 0;
             for ($c = 0; $c < $t; $c++) {
@@ -118,9 +151,64 @@ final class FormValidator
             }
             $d = ((10 * $d) % 11) % 10;
             if (((int)$clean[$c]) !== $d) {
-                $this->errors[$field] = "O campo {$label} possui um CPF inválido.";
-                return $this;
+                return false;
             }
+        }
+
+        return true;
+    }
+
+    public static function isValidCnpj(string $val): bool
+    {
+        $clean = preg_replace('/\D/', '', $val);
+        if (strlen($clean) !== 14 || preg_match('/^(\d)\1{13}$/', $clean)) {
+            return false;
+        }
+
+        $weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+        $weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+
+        $sum = 0;
+        for ($i = 0; $i < 12; $i++) {
+            $sum += ((int)$clean[$i]) * $weights1[$i];
+        }
+        $rem = $sum % 11;
+        $d1 = $rem < 2 ? 0 : 11 - $rem;
+        if ((int)$clean[12] !== $d1) {
+            return false;
+        }
+
+        $sum = 0;
+        for ($i = 0; $i < 13; $i++) {
+            $sum += ((int)$clean[$i]) * $weights2[$i];
+        }
+        $rem = $sum % 11;
+        $d2 = $rem < 2 ? 0 : 11 - $rem;
+        return (int)$clean[13] === $d2;
+    }
+
+    /**
+     * Valida política institucional de senha forte:
+     * mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial.
+     */
+    public function strongPassword(string $field, string $label, bool $required = true): self
+    {
+        $val = (string)($this->data[$field] ?? '');
+        if ($val === '') {
+            if ($required) {
+                $this->errors[$field] = "O campo {$label} é obrigatório.";
+            }
+            return $this;
+        }
+
+        $len = function_exists('mb_strlen') ? mb_strlen($val, 'UTF-8') : strlen($val);
+        if ($len < 8) {
+            $this->errors[$field] = "A {$label} deve ter no mínimo 8 caracteres.";
+            return $this;
+        }
+
+        if (!preg_match('/[A-Z]/', $val) || !preg_match('/[a-z]/', $val) || !preg_match('/\d/', $val) || !preg_match('/[^A-Za-z0-9]/', $val)) {
+            $this->errors[$field] = "A {$label} deve conter letra maiúscula, minúscula, número e símbolo especial.";
         }
 
         return $this;

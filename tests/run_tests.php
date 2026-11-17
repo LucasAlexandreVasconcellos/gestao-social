@@ -730,7 +730,7 @@ $t->run('NotificacaoService: Comunicação com o Cidadão (WhatsApp / SMS)', fun
     ]);
 
     $t->assert($res['success'], 'Disparo de notificação deve ter sucesso');
-    $t->assertEquals('enviado', $res['notificacao']->status);
+    $t->assertEquals('simulado', $res['notificacao']->status);
     $t->assert(str_contains($res['notificacao']->respostaProvedor, 'SIMULADO_OK') || str_contains($res['notificacao']->respostaProvedor, 'OK'), 'Deve registrar confirmação do provedor');
 
     // Listagem
@@ -775,6 +775,96 @@ $t->run('LgpdService: Anonimização de Titular (Art. 18 LGPD) e Varredura de In
     // 4. Listar protocolos
     $solicitacoes = $lgpdService->listarSolicitacoes();
     $t->assert(count($solicitacoes) >= 1, 'Deve registrar protocolo na lista de solicitações LGPD');
+
+    // 5. Garantir que dataNascimento antiga com cadastro recente NÃO seja sinalizada como inativa
+    $resRecente = $pessoaService->salvar([
+        'nomeCompleto' => 'Idoso Cadastro Recente Teste',
+        'dataNascimento' => '1950-02-10',
+        'cpf' => '111.444.777-35',
+        'escolaridade' => 'Fundamental',
+        'situacaoOcupacional' => 'Aposentado'
+    ]);
+    // Cria com dataCadastro atual
+    $inativosAtuais = $lgpdService->buscarInativos(5);
+    $falsamenteFlagrado = false;
+    foreach ($inativosAtuais as $itemInat) {
+        if ($resRecente['success'] && $itemInat['pessoa']->id === $resRecente['pessoa']->id) {
+            $falsamenteFlagrado = true;
+        }
+    }
+    $t->assert(!$falsamenteFlagrado, 'Varredura LGPD não deve confundir data_nascimento antiga com inatividade de cadastro recente');
+});
+
+$t->run('Segurança Governamental: Remoção de Backdoor, Lockout, RBAC, Política de Senhas e Assinatura HMAC', function() use ($t) {
+    /** @var \App\Services\AuthService $auth */
+    $auth = \App\Core\Container::resolve(\App\Services\AuthService::class);
+
+    // 1. Backdoor de senhas padrão removido
+    foreach (['admin123', 'Admin@123', 'Social@123', 'Estoque@123'] as $legacyPwd) {
+        $t->assert(!$auth->login('admin@gestaosocial.org', $legacyPwd), "Senha backdoor '{$legacyPwd}' deve falhar");
+    }
+
+    // 2. Política de senha forte + criação de usuário
+    $vFraca = new \App\Validators\FormValidator(['senha' => '123456']);
+    $vFraca->strongPassword('senha', 'Senha');
+    $t->assert(!$vFraca->isValid(), 'Senha fraca deve ser rejeitada pelo FormValidator');
+
+    $vForte = new \App\Validators\FormValidator(['senha' => 'Gov#Suas2026!']);
+    $vForte->strongPassword('senha', 'Senha');
+    $t->assert($vForte->isValid(), 'Senha forte deve ser aceita pelo FormValidator');
+
+    // 3. Criação de usuário e teste de lockout após 5 tentativas erradas
+    $created = $auth->createUser([
+        'nome' => 'Operador Teste Lockout',
+        'email' => 'lockout.teste@orgao.gov.br',
+        'perfil' => \App\Models\Usuario::PERFIL_CONSULTA,
+        'senha' => 'Segura#2026!',
+        'confirmarSenha' => 'Segura#2026!',
+        'ativo' => 1,
+        'trocarSenhaObrigatorio' => 0,
+    ]);
+    $t->assert($created['success'], 'Criação de usuário institucional deve funcionar');
+
+    for ($i = 0; $i < 5; $i++) {
+        $t->assert(!$auth->login('lockout.teste@orgao.gov.br', 'Errada#' . $i));
+    }
+    $lockedUser = $auth->findUserById($created['usuario']->id);
+    $t->assert($lockedUser->isLocked(), 'Conta deve estar bloqueada após 5 falhas consecutivas');
+    $t->assert(!$auth->login('lockout.teste@orgao.gov.br', 'Segura#2026!'), 'Conta bloqueada deve recusar até mesmo a senha correta durante o bloqueio');
+
+    // 4. Matriz RBAC granular (Consulta e Atendimento vs Dados Sensíveis / Usuários)
+    $consulta = new \App\Models\Usuario(10, 'Auditor', 'auditor@gov.br', \App\Models\Usuario::PERFIL_CONSULTA);
+    $t->assert($consulta->can('dashboard.view'), 'Perfil Consulta pode visualizar dashboard');
+    $t->assert($consulta->can('relatorios.view'), 'Perfil Consulta pode visualizar relatórios agregados');
+    $t->assert(!$consulta->can('relatorios.nominal'), 'Perfil Consulta NÃO pode visualizar relatórios nominais');
+    $t->assert(!$consulta->can('avaliacoes.sensitive'), 'Perfil Consulta NÃO pode acessar laudos/pareceres sensíveis');
+    $t->assert(!$consulta->can('usuarios.manage'), 'Perfil Consulta NÃO pode gerenciar usuários');
+
+    $atendente = new \App\Models\Usuario(11, 'Recepção', 'atendimento@gov.br', \App\Models\Usuario::PERFIL_ATENDIMENTO);
+    $t->assert($atendente->can('familias.view'), 'Atendimento pode visualizar famílias');
+    $t->assert(!$atendente->can('avaliacoes.sensitive'), 'Atendimento NÃO pode visualizar pareceres psicológicos/laudos sensíveis');
+    $t->assert(!$atendente->can('estoque.move'), 'Atendimento NÃO pode movimentar almoxarifado');
+
+    // 5. Anti Open-Redirect
+    $t->assertEquals('/dashboard', \App\Helpers\SecurityHelper::safeRedirectPath('https://evil.com/phishing'));
+    $t->assertEquals('/familias/1#documentos', \App\Helpers\SecurityHelper::safeRedirectPath('/familias/1#documentos'));
+
+    // 6. Validação HMAC-SHA256 pública de PDF
+    /** @var \App\Services\PdfService $pdfService */
+    $pdfService = \App\Core\Container::resolve(\App\Services\PdfService::class);
+    $payloadBen = 'BENEFICIO:BEN-2026-0001:2026-01-25:1';
+    $hmac = \App\Helpers\SecurityHelper::signDocumentPayload($payloadBen);
+    $checkValido = $pdfService->verificarDocumentoPublico('beneficio', 'BEN-2026-0001', $hmac);
+    $t->assert($checkValido['valido'] === true, 'Assinatura HMAC autêntica deve validar documento');
+    $checkInvalido = $pdfService->verificarDocumentoPublico('beneficio', 'BEN-2026-0001', str_repeat('F', 16));
+    $t->assert($checkInvalido['valido'] === false, 'Assinatura HMAC adulterada deve falhar na verificação pública');
+
+    // 7. Paginação uniforme
+    $pag = \App\Helpers\PaginationHelper::paginate(range(1, 35), 2, 15);
+    $t->assertEquals(15, count($pag['items']), 'Página 2 deve conter 15 itens');
+    $t->assertEquals(3, $pag['totalPages'], '35 itens por 15 deve gerar 3 páginas');
+    $t->assertEquals(16, $pag['from'], 'Índice inicial da página 2 deve ser 16');
+    $t->assertEquals(30, $pag['to'], 'Índice final da página 2 deve ser 30');
 });
 
 // Finaliza e imprime relatório

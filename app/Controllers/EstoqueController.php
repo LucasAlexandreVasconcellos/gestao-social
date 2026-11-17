@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\EstoqueService;
 
 final class EstoqueController
@@ -27,9 +28,12 @@ final class EstoqueController
         $produtos = $this->estoqueService->listarProdutos($filters);
         $produtosCriticos = $this->estoqueService->obterProdutosCriticos();
         $produtosVencendo = $this->estoqueService->obterProdutosVencendo(30);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($produtos, $page, 15);
 
         return View::render('estoque/index', [
-            'produtos' => $produtos,
+            'produtos' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters,
             'produtosCriticos' => $produtosCriticos,
             'produtosVencendo' => $produtosVencendo
@@ -106,9 +110,12 @@ final class EstoqueController
 
         $movimentacoes = $this->estoqueService->listarMovimentacoes($filters);
         $produtos = $this->estoqueService->listarProdutos();
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($movimentacoes, $page, 20);
 
         return View::render('estoque/movimentacoes', [
-            'movimentacoes' => $movimentacoes,
+            'movimentacoes' => $pag['items'],
+            'pagination' => $pag,
             'produtos' => $produtos,
             'filters' => $filters
         ]);
@@ -118,11 +125,16 @@ final class EstoqueController
     {
         $produtoId = (int)$request->query('produtoId', 0);
         $produtos = $this->estoqueService->listarProdutos();
+        $user = Session::get('user');
 
         return View::render('estoque/nova_movimentacao', [
             'produtos' => $produtos,
             'produtoId' => $produtoId,
-            'old' => Session::flash('old_input') ?? ['produtoId' => $produtoId, 'data' => date('Y-m-d')],
+            'old' => Session::flash('old_input') ?? [
+                'produtoId' => $produtoId,
+                'data' => date('Y-m-d'),
+                'responsavel' => $user['nome'] ?? '',
+            ],
             'errors' => Session::flash('form_errors') ?? []
         ]);
     }

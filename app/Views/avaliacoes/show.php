@@ -79,7 +79,7 @@ use App\Models\Familia;
     </div>
 
     <!-- Parecer Técnico -->
-    <div style="border-left: 4px solid var(--primary); padding-left: 16px;">
+    <div style="background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px;">
       <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">Parecer Técnico Social Fundamentado:</h4>
       <p style="font-size: 14px; line-height: 1.6; color: var(--text-main); white-space: pre-line;"><?= htmlspecialchars($avaliacao->parecerSocial, ENT_QUOTES, 'UTF-8') ?></p>
       

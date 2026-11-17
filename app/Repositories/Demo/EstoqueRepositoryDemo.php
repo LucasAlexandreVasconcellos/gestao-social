@@ -142,9 +142,9 @@ final class EstoqueRepositoryDemo implements EstoqueRepositoryInterface
         // Atualização em memória do estoque do produto correspondente
         $produto = $this->findProdutoById($mov->produtoId);
         if ($produto) {
-            if ($mov->tipo === 'Entrada') {
+            if ($mov->tipo === 'Entrada' || $mov->tipo === 'Ajuste Positivo') {
                 $produto->estoqueAtual += $mov->quantidade;
-            } elseif ($mov->tipo === 'Saída' || $mov->tipo === 'Perda') {
+            } elseif ($mov->tipo === 'Saída' || $mov->tipo === 'Perda' || $mov->tipo === 'Ajuste Negativo') {
                 $produto->estoqueAtual = max(0.0, $produto->estoqueAtual - $mov->quantidade);
             } elseif ($mov->tipo === 'Ajuste') {
                 $produto->estoqueAtual = $mov->quantidade;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Core;
 
-use App\Helpers\FormatHelper;
 use App\Helpers\SecurityHelper;
+use App\Models\Usuario;
 
 final class View
 {
@@ -24,21 +24,45 @@ final class View
             throw new \RuntimeException("View template não encontrada: {$templateFile}");
         }
 
-        // Extrai os dados para o escopo da view
         extract($data);
 
-        // Funções auxiliares disponíveis nas views
         $e = fn(?string $val): string => SecurityHelper::escape($val ?? '');
         $csrfField = fn(): string => '<input type="hidden" name="_csrf_token" value="' . Session::csrfToken() . '">';
         $csrfToken = fn(): string => Session::csrfToken();
-        $user = Session::get('user');
+        $sessionUser = Session::get('user');
+        if (!isset($user)) {
+            $user = $sessionUser;
+        }
 
-        // Captura o conteúdo do template filho
+        $usuarioObj = null;
+        if (is_array($sessionUser) && !empty($sessionUser['id'])) {
+            $usuarioObj = new Usuario(
+                (int)$sessionUser['id'],
+                (string)($sessionUser['nome'] ?? ''),
+                (string)($sessionUser['email'] ?? ''),
+                (string)($sessionUser['perfil'] ?? Usuario::PERFIL_CONSULTA),
+                (bool)($sessionUser['ativo'] ?? true),
+                $sessionUser['ultimoAcesso'] ?? null,
+                null,
+                (bool)($sessionUser['doisFatoresAtivo'] ?? false),
+                null,
+                [],
+                (string)($sessionUser['login'] ?? ''),
+                (bool)($sessionUser['trocarSenhaObrigatorio'] ?? false)
+            );
+        }
+
+        $can = static function (string $permission) use ($usuarioObj): bool {
+            return $usuarioObj !== null && $usuarioObj->can($permission);
+        };
+
+        $orgName = (string)Env::get('APP_ORG_NAME', 'Secretaria Municipal de Assistência Social');
+        $unitName = (string)Env::get('APP_UNIT_NAME', 'Gestão Socioassistencial — SUAS');
+
         ob_start();
         require $templateFile;
         $content = ob_get_clean();
 
-        // Se layout for nulo, retorna apenas o conteúdo
         if ($layout === null) {
             return $content;
         }
@@ -48,7 +72,6 @@ final class View
             throw new \RuntimeException("View layout não encontrado: {$layoutFile}");
         }
 
-        // Renderiza o layout passando $content e os dados
         ob_start();
         require $layoutFile;
         return ob_get_clean();

@@ -1,11 +1,11 @@
 <?php
-/** @var string $uri */
+use App\Helpers\IconHelper;
 ?>
 <div class="card">
   <div class="empty-state">
-    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-    <h2>404 — Página Não Encontrada</h2>
-    <p style="margin: 8px 0 20px;">A rota solicitada (<code><?= htmlspecialchars($uri ?? '', ENT_QUOTES, 'UTF-8') ?></code>) não foi encontrada ou não está disponível.</p>
+    <div class="empty-state-icon"><?= IconHelper::svg('info', 24) ?></div>
+    <h4>404 — Página Não Encontrada</h4>
+    <p class="mb-3">A rota solicitada (<span class="mono"><?= $e($uri ?? '') ?></span>) não foi encontrada ou não está disponível.</p>
     <a href="/dashboard" class="btn btn-primary">Voltar ao Painel Gerencial</a>
   </div>
 </div>

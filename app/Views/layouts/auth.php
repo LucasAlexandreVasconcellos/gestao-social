@@ -1,17 +1,16 @@
-<?php
-/** @var string $content */
-?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acesso — Sistema de Gestão Social e Assistencial</title>
+  <title><?= $e($pageTitle ?? 'Acesso Institucional — Gestão Social') ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/app.css">
 </head>
-<body style="background-color: #0b1f33; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px;">
-  <div style="width: 100%; max-width: 440px;">
-    <?= $content ?>
-  </div>
+<body class="auth-page">
+  <?= $content ?>
+  <script src="/assets/js/app.js"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\EstoqueRepositoryInterface;
 use App\Core\Database;
+use App\Core\Session;
 use App\Models\MovimentacaoEstoque;
 use App\Models\Produto;
 use PDO;
@@ -114,7 +115,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
             'cat_id' => $categoriaId,
             'codigo' => $produto->codigo,
             'nome' => $produto->nome,
-            'unidade' => $produto->unidadeMedida ?: 'Unidade',
+            'unidade' => $this->normalizeUnidade($produto->unidadeMedida),
             'minimo' => $produto->estoqueMinimo,
             'controla_validade' => !empty($produto->proximoVencimento) ? 'true' : 'false',
             'ativo' => $produto->ativo ? 'true' : 'false',
@@ -143,7 +144,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
             'cat_id' => $categoriaId,
             'codigo' => $produto->codigo,
             'nome' => $produto->nome,
-            'unidade' => $produto->unidadeMedida,
+            'unidade' => $this->normalizeUnidade($produto->unidadeMedida),
             'minimo' => $produto->estoqueMinimo,
             'ativo' => $produto->ativo ? 'true' : 'false',
         ]);
@@ -165,7 +166,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
 
         if (!empty($filters['tipo'])) {
             $sql .= " AND m.tipo = :tipo";
-            $params['tipo'] = $filters['tipo'];
+            $params['tipo'] = $this->normalizeMovTipo($filters['tipo']);
         }
 
         $sql .= " ORDER BY m.data_movimentacao DESC, m.id DESC";
@@ -197,6 +198,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
     public function saveMovimentacao(MovimentacaoEstoque $mov): MovimentacaoEstoque
     {
         $responsavelId = $this->resolveResponsavelId($mov->responsavel);
+        $tipoDb = $this->normalizeMovTipo($mov->tipo);
 
         $sql = "INSERT INTO gestao_social.movimentacoes_estoque (
                     produto_id, responsavel_id, tipo, quantidade,
@@ -210,7 +212,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
         $stmt->execute([
             'produto_id' => $mov->produtoId,
             'responsavel_id' => $responsavelId,
-            'tipo' => $mov->tipo,
+            'tipo' => $tipoDb,
             'quantidade' => $mov->quantidade,
             'data_mov' => $mov->data ?: date('Y-m-d H:i:s'),
             'lote' => $mov->lote,
@@ -220,6 +222,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
         ]);
 
         $mov->id = (int)$stmt->fetchColumn();
+        $mov->tipo = $tipoDb;
         return $mov;
     }
 
@@ -266,7 +269,7 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
     {
         return new Produto(
             (int)$row['id'],
-            $row['codigo'],
+            (string)($row['codigo'] ?? sprintf('PROD-%03d', (int)$row['id'])),
             $row['nome'],
             $row['categoria_nome'] ?? 'Geral',
             $row['unidade_medida'] ?? 'Unidade',
@@ -301,24 +304,59 @@ final class EstoqueRepositoryDb implements EstoqueRepositoryInterface
         return (int)($stmtFirst->fetchColumn() ?: 1);
     }
 
+    private function normalizeUnidade(string $unidade): string
+    {
+        $u = mb_strtoupper(trim($unidade), 'UTF-8');
+        if (in_array($u, ['UN', 'KG', 'LITRO', 'PCT', 'CX', 'LATA', 'KIT'], true)) {
+            return $u;
+        }
+        if (str_contains($u, 'QUILO') || $u === 'KGS') return 'KG';
+        if (str_contains($u, 'LITRO') || $u === 'L' || $u === 'LT') return 'LITRO';
+        if (str_contains($u, 'PACOT')) return 'PCT';
+        if (str_contains($u, 'CAIX')) return 'CX';
+        if (str_contains($u, 'LATA')) return 'LATA';
+        if (str_contains($u, 'KIT')) return 'KIT';
+        return 'UN';
+    }
+
+    private function normalizeMovTipo(string $tipo): string
+    {
+        $t = mb_strtolower(trim($tipo), 'UTF-8');
+        return match ($t) {
+            'entrada' => 'Entrada',
+            'saída', 'saida' => 'Saída',
+            'ajuste positivo', 'ajuste' => 'Ajuste Positivo',
+            'ajuste negativo' => 'Ajuste Negativo',
+            'perda' => 'Perda',
+            default => 'Entrada'
+        };
+    }
+
     private function resolveResponsavelId(string $nomeOuIdentificador): int
     {
-        $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
-        $stmt->execute([
-            'busca' => '%' . mb_strtolower(trim($nomeOuIdentificador), 'UTF-8') . '%',
-            'login' => mb_strtolower(trim($nomeOuIdentificador), 'UTF-8')
-        ]);
-        $id = $stmt->fetchColumn();
+        $busca = mb_strtolower(trim($nomeOuIdentificador), 'UTF-8');
+        if ($busca !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
+            $stmt->execute([
+                'busca' => '%' . $busca . '%',
+                'login' => $busca
+            ]);
+            $id = $stmt->fetchColumn();
+            if ($id) {
+                return (int)$id;
+            }
+        }
 
-        if ($id) {
-            return (int)$id;
+        $sessionUser = Session::get('user');
+        if (!empty($sessionUser['id'])) {
+            return (int)$sessionUser['id'];
         }
 
         $stmtDefault = $this->db->query("
             SELECT u.id 
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE p.nome IN ('Estoque', 'Administrador')
+             WHERE u.ativo = TRUE AND p.nome IN ('Estoque', 'Administrador')
              ORDER BY u.id ASC
              LIMIT 1
         ");

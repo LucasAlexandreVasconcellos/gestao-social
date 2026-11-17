@@ -87,4 +87,5 @@ use App\Helpers\FormatHelper;
       </tbody>
     </table>
   </div>
+  <?= \App\Core\View::renderPartial('partials/pagination', ['pagination' => $pagination ?? null, 'basePath' => '/avaliacoes', 'query' => ['familiaId' => $filters['familiaId'] ?? null, 'nivel' => $filters['nivelVulnerabilidade'] ?? null]]) ?>
 </div>

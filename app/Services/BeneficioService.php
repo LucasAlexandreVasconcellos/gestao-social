@@ -53,11 +53,40 @@ final class BeneficioService
             return ['success' => false, 'errors' => ['familiaId' => 'Família não encontrada.']];
         }
 
-        // Validação estrita: Não permitir confirmar uma entrega efetivada sem itens e quantidades
         $itensInput = $dados['itens'] ?? [];
         $situacao = $dados['situacao'] ?? 'Efetivada';
 
-        if ($situacao === 'Efetivada' && empty($itensInput)) {
+        $itensModels = [];
+        if (!empty($itensInput) && is_array($itensInput)) {
+            foreach ($itensInput as $itemData) {
+                if (empty($itemData['produtoId']) || empty($itemData['quantidade'])) {
+                    continue;
+                }
+                $produtoId = (int)$itemData['produtoId'];
+                $quantidade = (float)str_replace(',', '.', (string)$itemData['quantidade']);
+                if ($quantidade <= 0) {
+                    continue;
+                }
+                $produto = $this->estoqueRepo->findProdutoById($produtoId);
+                if ($situacao === 'Efetivada' && $produto && $quantidade > $produto->estoqueAtual) {
+                    return [
+                        'success' => false,
+                        'errors' => ['itens' => "Estoque insuficiente para '{$produto->nome}'. Disponível: {$produto->estoqueAtual} {$produto->unidadeMedida}."]
+                    ];
+                }
+                $itensModels[] = new ItemEntrega(
+                    0,
+                    0,
+                    $produtoId,
+                    $produto ? $produto->nome : 'Item Diverso',
+                    $quantidade,
+                    $produto ? $produto->unidadeMedida : 'UN',
+                    trim($itemData['lote'] ?? '') ?: null
+                );
+            }
+        }
+
+        if ($situacao === 'Efetivada' && empty($itensModels)) {
             return [
                 'success' => false,
                 'errors' => ['itens' => 'Não é permitido efetivar uma entrega sem itens e quantidades correspondentes cadastrados.']
@@ -73,53 +102,29 @@ final class BeneficioService
             trim($dados['tipoBeneficio']),
             trim($dados['responsavelDistribuicao']),
             $campanhaId,
-            [],
+            $itensModels,
             trim($dados['comprovante'] ?? '') ?: null,
             trim($dados['observacoes'] ?? '') ?: null,
             $situacao
         );
 
-        $savedEntrega = $this->beneficioRepo->save($entrega);
+        try {
+            $savedEntrega = $this->beneficioRepo->save($entrega);
+        } catch (\Throwable $e) {
+            return ['success' => false, 'errors' => ['geral' => 'Falha ao registrar entrega de benefício: ' . $e->getMessage()]];
+        }
 
-        // Processa os itens
-        if (!empty($itensInput) && is_array($itensInput)) {
-            foreach ($itensInput as $itemData) {
-                if (empty($itemData['produtoId']) || empty($itemData['quantidade'])) {
-                    continue;
-                }
-
-                $produtoId = (int)$itemData['produtoId'];
-                $quantidade = (float)str_replace(',', '.', (string)$itemData['quantidade']);
-                if ($quantidade <= 0) {
-                    continue;
-                }
-
-                $produto = $this->estoqueRepo->findProdutoById($produtoId);
-                $nomeProduto = $produto ? $produto->nome : 'Item Diverso';
-                $unidade = $produto ? $produto->unidadeMedida : 'Unidade';
-
-                $item = new ItemEntrega(
-                    0,
-                    $savedEntrega->id,
-                    $produtoId,
-                    $nomeProduto,
-                    $quantidade,
-                    $unidade,
-                    trim($itemData['lote'] ?? '') ?: null
-                );
-                $this->beneficioRepo->addItem($item);
-
-                // Se a entrega foi efetivada, simula em memória a baixa do estoque
-                // NOTA DE ARQUITETURA: Na futura integração com banco de dados,
-                // a gravação da entrega e a baixa do estoque DEVEM ocorrer dentro de uma transação atômica (BEGIN TRANSACTION ... COMMIT).
-                if ($this->isDemoEstoque() && $situacao === 'Efetivada' && $produto) {
+        if ($this->isDemoEstoque() && $situacao === 'Efetivada') {
+            foreach ($savedEntrega->itens as $item) {
+                $produto = $this->estoqueRepo->findProdutoById($item->produtoId);
+                if ($produto) {
                     $mov = new MovimentacaoEstoque(
                         0,
                         $savedEntrega->dataEntrega,
                         $produto->id,
                         $produto->nome,
                         'Saída',
-                        $quantidade,
+                        $item->quantidade,
                         $item->lote,
                         null,
                         "Família {$familia->codigo} ({$familia->pessoaReferenciaNome})",

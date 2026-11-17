@@ -233,19 +233,21 @@ final class FamiliaService
 
     public function desvincularIntegrante(int $vinculoId, string $motivo = ''): bool
     {
-        $vinculos = $this->familiaRepo->getIntegrantes(0, false);
-        // Busca o vínculo
-        foreach ($vinculos as $v) {
-            if ($v->id === $vinculoId) {
-                $v->ativo = false;
-                $v->dataTermino = date('Y-m-d');
-                $v->observacoes = trim($v->observacoes . ' | Vínculo encerrado: ' . $motivo);
-                $this->familiaRepo->updateIntegrante($v);
-                $this->auditLog->log('Desvincular Integrante', 'VinculoFamiliar', $vinculoId, "Vínculo familiar desativado (histórico preservado). Motivo: {$motivo}");
-                return true;
-            }
+        $vinculo = $this->familiaRepo->findVinculoById($vinculoId);
+        if (!$vinculo || !$vinculo->ativo) {
+            return false;
         }
-        return false;
+
+        $vinculo->ativo = false;
+        $vinculo->dataTermino = date('Y-m-d');
+        $motivoLimpo = trim($motivo) ?: 'Desligamento registrado pela equipe técnica';
+        $vinculo->observacoes = trim(($vinculo->observacoes ? $vinculo->observacoes . ' | ' : '') . 'Vínculo encerrado: ' . $motivoLimpo);
+
+        $ok = $this->familiaRepo->updateIntegrante($vinculo);
+        if ($ok) {
+            $this->auditLog->log('Desvincular Integrante', 'VinculoFamiliar', $vinculoId, "Vínculo familiar desativado (histórico preservado). Motivo: {$motivoLimpo}");
+        }
+        return $ok;
     }
 
     public function getBairros(): array

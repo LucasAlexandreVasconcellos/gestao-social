@@ -63,15 +63,21 @@ use App\Models\Notificacao;
             <tr>
               <td>
                 <?php if ($n->canal === 'whatsapp'): ?>
-                  <span class="badge badge-success" style="font-weight: 700;">🟢 WhatsApp</span>
+                  <span class="badge badge-success">WhatsApp</span>
                 <?php elseif ($n->canal === 'sms'): ?>
-                  <span class="badge badge-info" style="font-weight: 700;">📱 SMS</span>
+                  <span class="badge badge-info">SMS</span>
                 <?php else: ?>
                   <span class="badge badge-secondary"><?= htmlspecialchars($n->canal, ENT_QUOTES, 'UTF-8') ?></span>
                 <?php endif; ?>
-                
-                <div style="font-size: 11px; margin-top: 4px; color: var(--text-muted);">
-                  Status: <strong><?= htmlspecialchars($n->status, ENT_QUOTES, 'UTF-8') ?></strong>
+
+                <div style="font-size: 11px; margin-top: 4px;">
+                  <?php if ($n->status === 'simulado'): ?>
+                    <span class="badge badge-warning">Simulado (sem gateway)</span>
+                  <?php elseif ($n->status === 'falha'): ?>
+                    <span class="badge badge-danger">Falha no envio</span>
+                  <?php else: ?>
+                    <span class="badge badge-success">Enviado</span>
+                  <?php endif; ?>
                 </div>
               </td>
               <td>
@@ -109,4 +115,5 @@ use App\Models\Notificacao;
       </tbody>
     </table>
   </div>
+  <?= \App\Core\View::renderPartial('partials/pagination', ['pagination' => $pagination ?? null, 'basePath' => '/notificacoes/historico', 'query' => $filters ?? []]) ?>
 </div>

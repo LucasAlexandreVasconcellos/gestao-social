@@ -1,285 +1,312 @@
 <?php
 use App\Helpers\FormatHelper;
+use App\Helpers\IconHelper;
 
-/** @var int $totalFamilias */
-/** @var int $familiasAtivas */
-/** @var int $familiasAnalise */
-/** @var int $casosVulnerabilidadePrioritaria */
-/** @var int $familiasCriticas */
-/** @var int $totalPessoas */
-/** @var int $atendimentosPendentes */
-/** @var int $beneficiosEntregues */
-/** @var int $produtosEstoqueBaixo */
-/** @var int $produtosVencendo */
-/** @var float $doacoesValor */
-/** @var int $projetosAtivos */
-/** @var int $reavaliacoesPendentes */
-/** @var array $alertasVencimento */
-/** @var array $alertasEstoque */
-/** @var array $ultimosAtendimentos */
-/** @var array $ultimasEntregas */
+$dist = $distribuicaoVulnerabilidade ?? ['Crítica' => 0, 'Alta' => 0, 'Média' => 0, 'Baixa' => 0];
+$totalAvaliacoesDist = max(1, array_sum($dist));
+$maxBairroCount = !empty($topBairros) ? max(1, max($topBairros)) : 1;
 ?>
 
-<!-- Cabeçalho de Ações Rápidas -->
-<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+<div class="page-header">
   <div>
-    <h2 style="font-size: 22px; font-weight: 700; color: var(--text-main);">Painel de Indicadores Gerenciais</h2>
-    <p style="font-size: 13px; color: var(--text-muted);">Acompanhamento integrado de famílias, vulnerabilidades, estoque e benefícios assistenciais.</p>
+    <h1 class="page-title">Painel Gerencial Socioassistencial</h1>
+    <p class="page-subtitle">Vigilância territorial, atendimentos, estoque estratégico e concessões em tempo real.</p>
   </div>
-  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-    <a href="/familias/novo" class="btn btn-primary btn-sm">+ Cadastrar Família</a>
-    <a href="/atendimentos/novo" class="btn btn-secondary btn-sm">+ Registrar Atendimento</a>
-    <a href="/beneficios/novo" class="btn btn-secondary btn-sm">+ Nova Entrega</a>
-    <a href="/doacoes/novo" class="btn btn-secondary btn-sm">+ Receber Doação</a>
+  <div class="page-actions">
+    <?php if ($can('atendimentos.create')): ?>
+      <a href="/atendimentos/novo" class="btn btn-primary">
+        <?= IconHelper::svg('plus', 15) ?>
+        <span>Registrar Atendimento</span>
+      </a>
+    <?php endif; ?>
+    <?php if ($can('familias.create')): ?>
+      <a href="/familias/novo" class="btn btn-secondary">
+        <?= IconHelper::svg('home', 15) ?>
+        <span>Nova Família</span>
+      </a>
+    <?php endif; ?>
+    <?php if ($can('relatorios.view')): ?>
+      <a href="/relatorios" class="btn btn-secondary">
+        <?= IconHelper::svg('bar-chart', 15) ?>
+        <span>Relatórios BI</span>
+      </a>
+    <?php endif; ?>
   </div>
 </div>
 
-<!-- Alertas Críticos Prioritários -->
-<?php if ($produtosEstoqueBaixo > 0 || $reavaliacoesPendentes > 0 || $familiasCriticas > 0): ?>
-  <div style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <div style="background-color: var(--danger); color: #fff; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700;">!</div>
-      <div>
-        <div style="font-weight: 700; color: #9f1239; font-size: 14px;">Atenção Operacional & Social</div>
-        <div style="font-size: 13px; color: #881337;">
-          Existem <strong><?= $familiasCriticas ?> casos de extrema vulnerabilidade</strong>,
-          <strong><?= $reavaliacoesPendentes ?> reavaliações sociais pendentes</strong> e
-          <strong><?= $produtosEstoqueBaixo ?> itens de estoque abaixo do mínimo de segurança</strong>.
+<!-- Grade de KPIs Operacionais -->
+<div class="stats-grid">
+  <?php if ($can('familias.view')): ?>
+    <div class="stat-card">
+      <div class="stat-card-top">
+        <span class="stat-title">Famílias Cadastradas</span>
+        <span class="stat-icon-pill"><?= IconHelper::svg('home', 17) ?></span>
+      </div>
+      <div class="stat-value"><?= (int)$totalFamilias ?></div>
+      <div class="stat-desc"><?= (int)$familiasAtivas ?> ativas • <?= (int)$familiasAnalise ?> em análise</div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($can('avaliacoes.view')): ?>
+    <div class="stat-card danger">
+      <div class="stat-card-top">
+        <span class="stat-title">Vulnerabilidade Prioritária</span>
+        <span class="stat-icon-pill"><?= IconHelper::svg('alert-triangle', 17) ?></span>
+      </div>
+      <div class="stat-value"><?= (int)$casosVulnerabilidadePrioritaria ?></div>
+      <div class="stat-desc"><?= (int)$familiasCriticas ?> críticas • <?= (int)$reavaliacoesPendentes ?> reavaliações vencendo</div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($can('atendimentos.view')): ?>
+    <div class="stat-card warning">
+      <div class="stat-card-top">
+        <span class="stat-title">Atendimentos em Aberto</span>
+        <span class="stat-icon-pill"><?= IconHelper::svg('activity', 17) ?></span>
+      </div>
+      <div class="stat-value"><?= (int)$atendimentosPendentes ?></div>
+      <div class="stat-desc"><?= (int)$totalPessoas ?> cidadãos acompanhados</div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($can('beneficios.view')): ?>
+    <div class="stat-card success">
+      <div class="stat-card-top">
+        <span class="stat-title">Benefícios Efetivados</span>
+        <span class="stat-icon-pill"><?= IconHelper::svg('gift', 17) ?></span>
+      </div>
+      <div class="stat-value"><?= (int)$beneficiosEntregues ?></div>
+      <div class="stat-desc"><?= (int)$projetosAtivos ?> ações coletivas em andamento</div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($can('estoque.view')): ?>
+    <div class="stat-card warning">
+      <div class="stat-card-top">
+        <span class="stat-title">Alertas de Suprimentos</span>
+        <span class="stat-icon-pill"><?= IconHelper::svg('box', 17) ?></span>
+      </div>
+      <div class="stat-value"><?= (int)($produtosEstoqueBaixo + $produtosVencendo) ?></div>
+      <div class="stat-desc"><?= (int)$produtosEstoqueBaixo ?> abaixo do mínimo • <?= (int)$produtosVencendo ?> vencendo</div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($can('doacoes.view')): ?>
+    <div class="stat-card info">
+      <div class="stat-card-top">
+        <span class="stat-title">Captação Financeira</span>
+        <span class="stat-icon-pill"><?= IconHelper::svg('heart', 17) ?></span>
+      </div>
+      <div class="stat-value" style="font-size: 1.5rem;"><?= $e(FormatHelper::money((float)$doacoesValor)) ?></div>
+      <div class="stat-desc">Total consolidado em doações financeiras</div>
+    </div>
+  <?php endif; ?>
+</div>
+
+<!-- Painel Gráfico de Vigilância Socioassistencial e Territorial -->
+<div class="grid-2 mb-4">
+  <?php if ($can('avaliacoes.view')): ?>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <?= IconHelper::svg('clipboard', 17) ?>
+          <span>Estratificação de Vulnerabilidade Social</span>
+        </h2>
+        <span class="text-muted" style="font-size: 0.78rem;">Base: avaliações registradas</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-bars">
+          <?php
+          $niveisMeta = [
+              'Crítica' => 'critica',
+              'Alta' => 'alta',
+              'Média' => 'media',
+              'Baixa' => 'baixa',
+          ];
+          foreach ($niveisMeta as $label => $cls):
+              $qtd = (int)($dist[$label] ?? 0);
+              $pct = (int)round(($qtd / $totalAvaliacoesDist) * 100);
+          ?>
+            <div class="chart-bar-row">
+              <div class="chart-bar-meta">
+                <span class="chart-bar-label">Risco <?= $e($label) ?></span>
+                <span class="chart-bar-count"><?= $qtd ?> caso(s) (<?= $pct ?>%)</span>
+              </div>
+              <div class="chart-bar-track">
+                <div class="chart-bar-fill <?= $cls ?>" style="width: <?= $pct ?>%;"></div>
+              </div>
+            </div>
+          <?php endforeach; ?>
         </div>
       </div>
     </div>
-    <div style="display: flex; gap: 8px;">
-      <a href="/avaliacoes" class="btn btn-danger btn-sm">Ver Avaliações</a>
-      <a href="/estoque?baixo=1" class="btn btn-secondary btn-sm">Ver Estoque Baixo</a>
+  <?php endif; ?>
+
+  <?php if ($can('familias.view')): ?>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <?= IconHelper::svg('home', 17) ?>
+          <span>Concentração Territorial por Bairro</span>
+        </h2>
+        <span class="text-muted" style="font-size: 0.78rem;">Top 5 territórios</span>
+      </div>
+      <div class="card-body">
+        <?php if (empty($topBairros)): ?>
+          <p class="text-muted">Sem registros territoriais cadastrados até o momento.</p>
+        <?php else: ?>
+          <div class="chart-bars">
+            <?php foreach ($topBairros as $bairro => $qtdBairro):
+              $pctBairro = (int)round(($qtdBairro / $maxBairroCount) * 100);
+            ?>
+              <div class="chart-bar-row">
+                <div class="chart-bar-meta">
+                  <span class="chart-bar-label"><?= $e($bairro) ?></span>
+                  <span class="chart-bar-count"><?= (int)$qtdBairro ?> família(s)</span>
+                </div>
+                <div class="chart-bar-track">
+                  <div class="chart-bar-fill" style="width: <?= $pctBairro ?>%;"></div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+</div>
+
+<?php if ($can('estoque.view') && (!empty($alertasEstoque) || !empty($alertasVencimento))): ?>
+  <div class="card mb-4">
+    <div class="card-header">
+      <h2 class="card-title">
+        <?= IconHelper::svg('alert-triangle', 17) ?>
+        <span>Vigilância Logística (Estoque Crítico & Validade FEFO)</span>
+      </h2>
+      <a href="/estoque" class="btn btn-secondary btn-sm">Gerenciar Almoxarifado</a>
+    </div>
+    <div class="card-body">
+      <div class="grid-2">
+        <div>
+          <h3 class="detail-label mb-2">Itens Abaixo do Mínimo</h3>
+          <?php if (empty($alertasEstoque)): ?>
+            <p class="text-muted">Todos os itens estão acima do estoque mínimo configurado.</p>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table">
+                <thead><tr><th>Item</th><th>Saldo</th><th>Mínimo</th></tr></thead>
+                <tbody>
+                  <?php foreach ($alertasEstoque as $p): ?>
+                    <tr>
+                      <td><strong><?= $e($p->nome) ?></strong></td>
+                      <td><span class="badge badge-danger tabular-nums"><?= $e((string)$p->estoqueAtual) ?> <?= $e($p->unidadeMedida) ?></span></td>
+                      <td class="tabular-nums"><?= $e((string)$p->estoqueMinimo) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <div>
+          <h3 class="detail-label mb-2">Lotes Próximos do Vencimento (45 dias)</h3>
+          <?php if (empty($alertasVencimento)): ?>
+            <p class="text-muted">Nenhum lote com vencimento próximo nos próximos 45 dias.</p>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table">
+                <thead><tr><th>Item</th><th>Vencimento</th><th>Saldo</th></tr></thead>
+                <tbody>
+                  <?php foreach ($alertasVencimento as $p): ?>
+                    <tr>
+                      <td><strong><?= $e($p->nome) ?></strong></td>
+                      <td><span class="badge badge-warning tabular-nums"><?= $e(FormatHelper::date($p->proximoVencimento)) ?></span></td>
+                      <td class="tabular-nums"><?= $e((string)$p->estoqueAtual) ?> <?= $e($p->unidadeMedida) ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
     </div>
   </div>
 <?php endif; ?>
 
-<!-- Grid de Indicadores Gerenciais (Módulo 1) -->
-<div class="metrics-grid">
-  <!-- Famílias Cadastradas -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Famílias Cadastradas</span>
-      <div class="metric-icon">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+<div class="grid-2">
+  <?php if ($can('atendimentos.view')): ?>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <?= IconHelper::svg('activity', 17) ?>
+          <span>Atendimentos Recentes</span>
+        </h2>
+        <a href="/atendimentos" class="btn btn-secondary btn-sm">Ver todos</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Tipo</th><th>Técnico</th><th>Situação</th></tr>
+          </thead>
+          <tbody>
+            <?php if (empty($ultimosAtendimentos)): ?>
+              <tr><td colspan="4" class="text-center text-muted">Nenhum atendimento registrado.</td></tr>
+            <?php else: ?>
+              <?php foreach ($ultimosAtendimentos as $at): ?>
+                <tr>
+                  <td class="tabular-nums"><?= $e(FormatHelper::date($at->dataAtendimento)) ?></td>
+                  <td><a href="/atendimentos/<?= (int)$at->id ?>"><strong><?= $e($at->tipo) ?></strong></a></td>
+                  <td><?= $e($at->profissionalResponsavel) ?></td>
+                  <td>
+                    <span class="badge <?= $at->situacao === 'Concluído' ? 'badge-success' : 'badge-warning' ?>">
+                      <?= $e($at->situacao) ?>
+                    </span>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
       </div>
     </div>
-    <div class="metric-value"><?= $totalFamilias ?></div>
-    <div class="metric-subtitle">
-      <span style="color: var(--success); font-weight: 600;"><?= $familiasAtivas ?> Ativas</span> • 
-      <span style="color: var(--warning); font-weight: 600;"><?= $familiasAnalise ?> Em Análise</span>
-    </div>
-  </div>
+  <?php endif; ?>
 
-  <!-- Pessoas Atendidas -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Pessoas / Beneficiários</span>
-      <div class="metric-icon" style="background-color: #f0fdf4; color: var(--success);">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+  <?php if ($can('beneficios.view')): ?>
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <?= IconHelper::svg('gift', 17) ?>
+          <span>Entregas Recentes de Benefícios</span>
+        </h2>
+        <a href="/beneficios" class="btn btn-secondary btn-sm">Ver todas</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Benefício</th><th>Responsável</th><th>Situação</th></tr>
+          </thead>
+          <tbody>
+            <?php if (empty($ultimasEntregas)): ?>
+              <tr><td colspan="4" class="text-center text-muted">Nenhuma entrega registrada.</td></tr>
+            <?php else: ?>
+              <?php foreach ($ultimasEntregas as $b): ?>
+                <tr>
+                  <td class="tabular-nums"><?= $e(FormatHelper::date($b->dataEntrega)) ?></td>
+                  <td><a href="/beneficios/<?= (int)$b->id ?>"><strong><?= $e($b->tipoBeneficio) ?></strong></a></td>
+                  <td><?= $e($b->responsavelDistribuicao) ?></td>
+                  <td>
+                    <span class="badge <?= $b->situacao === 'Efetivada' ? 'badge-success' : ($b->situacao === 'Cancelada' ? 'badge-danger' : 'badge-info') ?>">
+                      <?= $e($b->situacao) ?>
+                    </span>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
       </div>
     </div>
-    <div class="metric-value"><?= $totalPessoas ?></div>
-    <div class="metric-subtitle">Integrantes vinculados nos núcleos</div>
-  </div>
-
-  <!-- Alta Prioridade Social -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Prioridade Social</span>
-      <div class="metric-icon" style="background-color: var(--danger-bg); color: var(--danger);">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-      </div>
-    </div>
-    <div class="metric-value" style="color: var(--danger);"><?= $casosVulnerabilidadePrioritaria ?></div>
-    <div class="metric-subtitle">Vulnerabilidade Crítica ou Alta</div>
-  </div>
-
-  <!-- Atendimentos Pendentes -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Atendimentos Pendentes</span>
-      <div class="metric-icon" style="background-color: var(--warning-bg); color: var(--warning);">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-      </div>
-    </div>
-    <div class="metric-value"><?= $atendimentosPendentes ?></div>
-    <div class="metric-subtitle">Aguardando providência ou visita</div>
-  </div>
-
-  <!-- Benefícios Entregues -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Entregas de Benefícios</span>
-      <div class="metric-icon" style="background-color: #fdf4ff; color: #a855f7;">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect width="20" height="5" x="2" y="7"></rect></svg>
-      </div>
-    </div>
-    <div class="metric-value"><?= $beneficiosEntregues ?></div>
-    <div class="metric-subtitle">Distribuições efetivadas este ano</div>
-  </div>
-
-  <!-- Estoque em Alerta -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Estoque Crítico</span>
-      <div class="metric-icon" style="background-color: var(--warning-bg); color: var(--warning);">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path></svg>
-      </div>
-    </div>
-    <div class="metric-value" style="color: <?= $produtosEstoqueBaixo > 0 ? 'var(--danger)' : 'var(--text-main)' ?>;"><?= $produtosEstoqueBaixo ?></div>
-    <div class="metric-subtitle"><?= $produtosVencendo ?> itens com validade próxima</div>
-  </div>
-
-  <!-- Doações Financeiras -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Doações Financeiras</span>
-      <div class="metric-icon" style="background-color: #f0fdf4; color: var(--success);">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-      </div>
-    </div>
-    <div class="metric-value"><?= FormatHelper::money($doacoesValor) ?></div>
-    <div class="metric-subtitle">Recursos diretos captados</div>
-  </div>
-
-  <!-- Projetos e Oficinas -->
-  <div class="metric-card">
-    <div class="metric-header">
-      <span class="metric-title">Projetos & Ações</span>
-      <div class="metric-icon" style="background-color: #e0f2fe; color: var(--info);">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
-      </div>
-    </div>
-    <div class="metric-value"><?= $projetosAtivos ?></div>
-    <div class="metric-subtitle">Campanhas/Oficinas em andamento</div>
-  </div>
+  <?php endif; ?>
 </div>
-
-<!-- Painéis de Acompanhamento Recente -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-  <!-- Últimos Atendimentos -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-        <span>Atendimentos Recentes</span>
-      </div>
-      <a href="/atendimentos" class="btn btn-secondary btn-sm">Ver Todos</a>
-    </div>
-    <div class="table-responsive">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Tipo</th>
-            <th>Profissional</th>
-            <th>Situação</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php if (empty($ultimosAtendimentos)): ?>
-            <tr><td colspan="4" class="empty-state">Nenhum atendimento registrado.</td></tr>
-          <?php else: ?>
-            <?php foreach ($ultimosAtendimentos as $at): ?>
-              <tr>
-                <td><?= FormatHelper::date($at->dataAtendimento) ?></td>
-                <td><a href="/atendimentos/<?= $at->id ?>" style="font-weight: 600; color: var(--primary); text-decoration: none;"><?= htmlspecialchars($at->tipo, ENT_QUOTES, 'UTF-8') ?></a></td>
-                <td style="font-size: 13px;"><?= htmlspecialchars($at->profissionalResponsavel, ENT_QUOTES, 'UTF-8') ?></td>
-                <td><?= FormatHelper::badgeStatus($at->situacao) ?></td>
-              </tr>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Últimas Entregas de Benefícios -->
-  <div class="card">
-    <div class="card-header">
-      <div class="card-title">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect width="20" height="5" x="2" y="7"></rect></svg>
-        <span>Distribuição de Benefícios</span>
-      </div>
-      <a href="/beneficios" class="btn btn-secondary btn-sm">Ver Todas</a>
-    </div>
-    <div class="table-responsive">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Data</th>
-            <th>Benefício</th>
-            <th>Itens</th>
-            <th>Situação</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php if (empty($ultimasEntregas)): ?>
-            <tr><td colspan="4" class="empty-state">Nenhuma entrega registrada.</td></tr>
-          <?php else: ?>
-            <?php foreach ($ultimasEntregas as $be): ?>
-              <tr>
-                <td><?= FormatHelper::date($be->dataEntrega) ?></td>
-                <td><a href="/beneficios/<?= $be->id ?>" style="font-weight: 600; color: var(--primary); text-decoration: none;"><?= htmlspecialchars($be->tipoBeneficio, ENT_QUOTES, 'UTF-8') ?></a></td>
-                <td><?= count($be->itens) ?> item(ns)</td>
-                <td><?= FormatHelper::badgeStatus($be->situacao) ?></td>
-              </tr>
-            <?php endforeach; ?>
-          <?php endif; ?>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Tabela de Alertas de Vencimento e Estoque Mínimo -->
-<?php if (!empty($alertasVencimento) || !empty($alertasEstoque)): ?>
-<div class="card">
-  <div class="card-header">
-    <div class="card-title">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path></svg>
-      <span>Alertas de Almoxarifado (Estoque Baixo & Vencimentos Próximos)</span>
-    </div>
-    <a href="/estoque" class="btn btn-secondary btn-sm">Gerenciar Almoxarifado</a>
-  </div>
-  <div class="table-responsive">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Produto</th>
-          <th>Categoria</th>
-          <th>Saldo Atual</th>
-          <th>Estoque Mínimo</th>
-          <th>Validade</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach (array_merge($alertasEstoque, $alertasVencimento) as $prod): ?>
-          <tr>
-            <td><strong><?= htmlspecialchars($prod->codigo, ENT_QUOTES, 'UTF-8') ?></strong></td>
-            <td><?= htmlspecialchars($prod->nome, ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= htmlspecialchars($prod->categoria, ENT_QUOTES, 'UTF-8') ?></td>
-            <td style="font-weight: 700; color: <?= $prod->isEstoqueBaixo() ? 'var(--danger)' : 'var(--text-main)' ?>;">
-              <?= $prod->estoqueAtual ?> <?= htmlspecialchars($prod->unidadeMedida, ENT_QUOTES, 'UTF-8') ?>
-            </td>
-            <td><?= $prod->estoqueMinimo ?> <?= htmlspecialchars($prod->unidadeMedida, ENT_QUOTES, 'UTF-8') ?></td>
-            <td><?= FormatHelper::date($prod->proximoVencimento) ?></td>
-            <td>
-              <?php if ($prod->isEstoqueBaixo()): ?>
-                <span class="badge badge-danger">Estoque Baixo</span>
-              <?php endif; ?>
-              <?php if (!empty($prod->proximoVencimento) && strtotime($prod->proximoVencimento) <= time() + (30 * 86400)): ?>
-                <span class="badge badge-warning">Validade Próxima</span>
-              <?php endif; ?>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-</div>
-<?php endif; ?>

@@ -12,8 +12,8 @@ if (!headers_sent()) {
     header('X-XSS-Protection: 1; mode=block');
     header('Referrer-Policy: strict-origin-when-cross-origin');
     header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
-    if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') || 
-        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+    if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
+        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
 }
@@ -31,20 +31,20 @@ use App\Core\View;
 Autoloader::register();
 Autoloader::addNamespace('App', ROOT_PATH . '/app');
 
-// Garante que o diretório de armazenamento de sessão exista e seja gravável
+// Garante que o diretório de armazenamento de sessão exista com permissão restrita
 $storageSessionPath = ROOT_PATH . '/storage/sessions';
 if (!is_dir($storageSessionPath)) {
-    @mkdir($storageSessionPath, 0777, true);
+    @mkdir($storageSessionPath, 0750, true);
 }
 if (is_dir($storageSessionPath) && is_writable($storageSessionPath)) {
     session_save_path($storageSessionPath);
 }
 
+// Configurações e Injeção de Dependências (carrega .env antes da sessão)
+require_once ROOT_PATH . '/config/app.php';
+
 // Inicialização segura de sessão
 Session::start();
-
-// Configurações e Injeção de Dependências
-require_once ROOT_PATH . '/config/app.php';
 
 // Inicialização da camada de Views
 View::init(ROOT_PATH . '/app/Views');

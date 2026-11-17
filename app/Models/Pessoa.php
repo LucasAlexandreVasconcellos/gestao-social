@@ -13,11 +13,12 @@ final class Pessoa
         public string $dataNascimento,
         public ?string $cpf,
         public ?string $telefone,
-        public string $escolaridade, // Fundamental Incompleto, Fundamental Completo, Médio, Superior, etc.
+        public string $escolaridade,
         public ?string $ocupacao,
-        public string $situacaoOcupacional, // Empregado, Desempregado, Autônomo, Aposentado, etc.
+        public string $situacaoOcupacional,
         public ?string $observacoes = null,
-        public string $situacaoCadastro = 'Ativo' // Ativo, Inativo
+        public string $situacaoCadastro = 'Ativo',
+        public ?string $dataCadastro = null
     ) {}
 
     public function toArray(): array

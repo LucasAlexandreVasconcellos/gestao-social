@@ -81,9 +81,9 @@
     <div class="metric-value"><?= $indicadores['totalEstoque'] ?? 0 ?> <span style="font-size: 14px; font-weight: 500; color: var(--text-muted);">itens</span></div>
     <div class="metric-subtitle">
       <?php if (($indicadores['estoqueCritico'] ?? 0) > 0): ?>
-        <span style="color: var(--danger); font-weight: 600;">⚠️ <?= $indicadores['estoqueCritico'] ?> itens com estoque baixo</span>
+        <span style="color: var(--danger); font-weight: 600;"><?= $indicadores['estoqueCritico'] ?> itens com estoque baixo</span>
       <?php else: ?>
-        <span style="color: var(--success); font-weight: 600;">✓ Níveis normais de segurança</span>
+        <span style="color: var(--success); font-weight: 600;">Níveis normais de segurança</span>
       <?php endif; ?>
     </div>
   </div>
@@ -187,9 +187,11 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>CSV Anonimizado</span>
         </a>
-        <a href="/relatorios/exportar?tipo=familias&anonimizado=0" class="btn btn-outline btn-sm" style="color: var(--danger);" title="Exportação com nomes nominais — Requer justificativa de uso e registro de auditoria" onclick="return confirm('ATENÇÃO LGPD: Você está prestes a exportar dados pessoais nominais não-anonimizados. Seu usuário e horário serão registrados na Trilha de Auditoria. Deseja prosseguir?');">
-          <span>CSV Nominal</span>
-        </a>
+        <?php if ($can('relatorios.nominal')): ?>
+          <a href="/relatorios/exportar?tipo=familias&anonimizado=0" class="btn btn-outline btn-sm" style="color: var(--danger);" title="Exportação com nomes nominais — Requer justificativa de uso e registro de auditoria" onclick="return confirm('ATENÇÃO LGPD: Você está prestes a exportar dados pessoais nominais não-anonimizados. Seu usuário e horário serão registrados na Trilha de Auditoria. Deseja prosseguir?');">
+            <span>CSV Nominal</span>
+          </a>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -317,9 +319,11 @@
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           <span>CSV Anonimizado</span>
         </a>
-        <a href="/relatorios/exportar?tipo=entregas&anonimizado=0" class="btn btn-outline btn-sm" style="color: var(--danger);" title="Exportar com identificação completa dos recebedores (auditoria interna)" onclick="return confirm('ATENÇÃO LGPD: Você está exportando a lista nominal de beneficiários. Esta ação é auditada e deve ser restrita ao uso institucional legal. Deseja continuar?');">
-          <span>CSV Nominal</span>
-        </a>
+        <?php if ($can('relatorios.nominal')): ?>
+          <a href="/relatorios/exportar?tipo=entregas&anonimizado=0" class="btn btn-outline btn-sm" style="color: var(--danger);" title="Exportar com identificação completa dos recebedores (auditoria interna)" onclick="return confirm('ATENÇÃO LGPD: Você está exportando a lista nominal de beneficiários. Esta ação é auditada e deve ser restrita ao uso institucional legal. Deseja continuar?');">
+            <span>CSV Nominal</span>
+          </a>
+        <?php endif; ?>
       </div>
     </div>
 

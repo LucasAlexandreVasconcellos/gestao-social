@@ -39,6 +39,11 @@ final class Env
             $name = trim($name);
             $value = trim($value);
 
+            // Não sobrescreve variáveis já definidas no ambiente do processo (ex.: CI ou testes)
+            if (getenv($name) !== false || array_key_exists($name, $_ENV)) {
+                continue;
+            }
+
             // Remove aspas simples ou duplas se houver
             if ((str_starts_with($value, '"') && str_ends_with($value, '"')) ||
                 (str_starts_with($value, "'") && str_ends_with($value, "'"))) {

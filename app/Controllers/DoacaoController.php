@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\DoacaoService;
 use App\Services\EstoqueService;
 use App\Services\PdfService;
@@ -28,9 +29,12 @@ final class DoacaoController
         ];
 
         $doacoes = $this->doacaoService->listar($filters);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($doacoes, $page, 15);
 
         return View::render('doacoes/index', [
-            'doacoes' => $doacoes,
+            'doacoes' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters
         ]);
     }
@@ -38,10 +42,14 @@ final class DoacaoController
     public function create(Request $request): string
     {
         $produtos = $this->estoqueService->listarProdutos();
+        $user = Session::get('user');
 
         return View::render('doacoes/create', [
             'produtos' => $produtos,
-            'old' => Session::flash('old_input') ?? ['dataRecebimento' => date('Y-m-d')],
+            'old' => Session::flash('old_input') ?? [
+                'dataRecebimento' => date('Y-m-d'),
+                'responsavel' => $user['nome'] ?? '',
+            ],
             'errors' => Session::flash('form_errors') ?? []
         ]);
     }

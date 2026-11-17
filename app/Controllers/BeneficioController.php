@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\BeneficioService;
 use App\Services\EstoqueService;
 use App\Services\FamiliaService;
@@ -33,9 +34,12 @@ final class BeneficioController
         ];
 
         $beneficios = $this->beneficioService->listar($filters);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($beneficios, $page, 15);
 
         return View::render('beneficios/index', [
-            'beneficios' => $beneficios,
+            'beneficios' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters
         ]);
     }
@@ -47,13 +51,18 @@ final class BeneficioController
         $familiaSelecionada = $familiaId > 0 ? $this->familiaService->obterPorId($familiaId) : null;
         $produtos = $this->estoqueService->listarProdutos();
         $projetos = $this->projetoService->listar();
+        $user = Session::get('user');
 
         return View::render('beneficios/create', [
             'familias' => $familias,
             'familiaSelecionada' => $familiaSelecionada,
             'produtos' => $produtos,
             'projetos' => $projetos,
-            'old' => Session::flash('old_input') ?? ['familiaId' => $familiaId, 'dataEntrega' => date('Y-m-d')],
+            'old' => Session::flash('old_input') ?? [
+                'familiaId' => $familiaId,
+                'dataEntrega' => date('Y-m-d'),
+                'responsavelDistribuicao' => $user['nome'] ?? '',
+            ],
             'errors' => Session::flash('form_errors') ?? []
         ]);
     }

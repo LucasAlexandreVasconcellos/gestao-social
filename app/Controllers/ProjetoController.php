@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\FamiliaService;
 use App\Services\PessoaService;
 use App\Services\ProjetoService;
@@ -28,17 +29,24 @@ final class ProjetoController
         ];
 
         $projetos = $this->projetoService->listar($filters);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($projetos, $page, 15);
 
         return View::render('projetos/index', [
-            'projetos' => $projetos,
+            'projetos' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters
         ]);
     }
 
     public function create(Request $request): string
     {
+        $user = Session::get('user');
         return View::render('projetos/create', [
-            'old' => Session::flash('old_input') ?? ['dataInicio' => date('Y-m-d')],
+            'old' => Session::flash('old_input') ?? [
+                'dataInicio' => date('Y-m-d'),
+                'responsavel' => $user['nome'] ?? '',
+            ],
             'errors' => Session::flash('form_errors') ?? []
         ]);
     }

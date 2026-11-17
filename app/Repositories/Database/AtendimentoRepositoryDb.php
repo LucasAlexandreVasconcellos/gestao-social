@@ -6,6 +6,7 @@ namespace App\Repositories\Database;
 
 use App\Contracts\Repositories\AtendimentoRepositoryInterface;
 use App\Core\Database;
+use App\Core\Session;
 use App\Models\Atendimento;
 use App\Models\Encaminhamento;
 use PDO;
@@ -274,22 +275,29 @@ final class AtendimentoRepositoryDb implements AtendimentoRepositoryInterface
 
     private function resolveResponsavelId(string $nomeOuIdentificador): int
     {
-        $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
-        $stmt->execute([
-            'busca' => '%' . mb_strtolower(trim($nomeOuIdentificador), 'UTF-8') . '%',
-            'login' => mb_strtolower(trim($nomeOuIdentificador), 'UTF-8')
-        ]);
-        $id = $stmt->fetchColumn();
+        $busca = mb_strtolower(trim($nomeOuIdentificador), 'UTF-8');
+        if ($busca !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM gestao_social.usuarios WHERE LOWER(nome) LIKE :busca OR LOWER(login) = :login LIMIT 1");
+            $stmt->execute([
+                'busca' => '%' . $busca . '%',
+                'login' => $busca
+            ]);
+            $id = $stmt->fetchColumn();
+            if ($id) {
+                return (int)$id;
+            }
+        }
 
-        if ($id) {
-            return (int)$id;
+        $sessionUser = Session::get('user');
+        if (!empty($sessionUser['id'])) {
+            return (int)$sessionUser['id'];
         }
 
         $stmtDefault = $this->db->query("
             SELECT u.id 
               FROM gestao_social.usuarios u
               JOIN gestao_social.perfis p ON p.id = u.perfil_id
-             WHERE p.nome IN ('Assistente Social', 'Atendimento / Recepção', 'Administrador')
+             WHERE u.ativo = TRUE AND p.nome IN ('Assistente Social', 'Atendimento / Recepção', 'Administrador')
              ORDER BY u.id ASC
              LIMIT 1
         ");

@@ -13,8 +13,8 @@ final class Doacao
         public ?string $documento = null, // CPF ou CNPJ
         public ?string $telefone = null,
         public ?string $email = null,
-        public string $tipoDoacao, // Produtos, Financeira, Serviços/Outros
-        public string $dataRecebimento,
+        public string $tipoDoacao = 'Produtos', // Produtos, Financeira, Serviços/Outros
+        public string $dataRecebimento = '',
         public ?float $valorEstimado = null,
         public string $descricao = '',
         public ?string $comprovante = null,

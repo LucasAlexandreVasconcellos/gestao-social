@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\AvaliacaoService;
 use App\Services\FamiliaService;
 
@@ -27,9 +28,12 @@ final class AvaliacaoController
 
         $avaliacoes = $this->avaliacaoService->listar($filters);
         $reavaliacoesPendentes = $this->avaliacaoService->obterReavaliacoesPendentes(30);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($avaliacoes, $page, 15);
 
         return View::render('avaliacoes/index', [
-            'avaliacoes' => $avaliacoes,
+            'avaliacoes' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters,
             'reavaliacoesPendentes' => $reavaliacoesPendentes
         ]);
@@ -40,11 +44,16 @@ final class AvaliacaoController
         $familiaId = (int)$request->query('familiaId', 0);
         $familias = $this->familiaService->listar();
         $familiaSelecionada = $familiaId > 0 ? $this->familiaService->obterPorId($familiaId) : null;
+        $user = Session::get('user');
 
         return View::render('avaliacoes/create', [
             'familias' => $familias,
             'familiaSelecionada' => $familiaSelecionada,
-            'old' => Session::flash('old_input') ?? ['familiaId' => $familiaId],
+            'old' => Session::flash('old_input') ?? [
+                'familiaId' => $familiaId,
+                'dataAvaliacao' => date('Y-m-d'),
+                'responsavelAvaliacao' => $user['nome'] ?? '',
+            ],
             'errors' => Session::flash('form_errors') ?? []
         ]);
     }

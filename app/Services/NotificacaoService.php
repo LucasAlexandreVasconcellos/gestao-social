@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Repositories\NotificacaoRepositoryInterface;
+use App\Core\Env;
 use App\Core\Session;
 use App\Models\Notificacao;
 
@@ -46,12 +47,14 @@ final class NotificacaoService
         $usuario = Session::get('user');
         $usuarioId = $usuario ? (int)$usuario['id'] : null;
 
-        // Disparo via Provedor (Simulado ou Webhook)
-        $webhookUrl = getenv('NOTIFICACOES_WEBHOOK_URL') ?: null;
-        $status = 'enviado';
-        $respostaProvedor = 'SIMULADO_OK: Protocolo ' . strtoupper(bin2hex(random_bytes(4)));
+        // Disparo via Provedor (Simulado ou Webhook HTTP configurado via Env)
+        $webhookUrl = Env::get('NOTIF_WEBHOOK_URL') ?: (Env::get('NOTIFICACOES_WEBHOOK_URL') ?: null);
+        $webhookToken = Env::get('NOTIF_WEBHOOK_TOKEN');
+        $status = 'simulado';
+        $respostaProvedor = 'SIMULADO_OK (Sem gateway HTTP configurado): Protocolo ' . strtoupper(bin2hex(random_bytes(4)));
 
         if ($webhookUrl && filter_var($webhookUrl, FILTER_VALIDATE_URL)) {
+            $status = 'enviado';
             try {
                 $payload = json_encode([
                     'canal' => $canal,
@@ -64,10 +67,15 @@ final class NotificacaoService
                     'timestamp' => date('c')
                 ]);
 
+                $headers = "Content-Type: application/json\r\nAccept: application/json\r\n";
+                if (!empty($webhookToken)) {
+                    $headers .= "Authorization: Bearer {$webhookToken}\r\n";
+                }
+
                 $ctx = stream_context_create([
                     'http' => [
                         'method' => 'POST',
-                        'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
+                        'header' => $headers,
                         'content' => $payload,
                         'timeout' => 5
                     ]

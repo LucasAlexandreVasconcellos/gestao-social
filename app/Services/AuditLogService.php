@@ -14,7 +14,7 @@ final class AuditLogService
         private AuditoriaRepositoryInterface $auditoriaRepo
     ) {}
 
-    public function log(string $operacao, string $entidade, string|int $registroId, string $detalhes = ''): void
+    public function log(string $operacao, string $entidade, string|int|null $registroId, string $detalhes = ''): void
     {
         $user = Session::get('user');
         $userId = $user['id'] ?? 0;
@@ -30,7 +30,7 @@ final class AuditLogService
             date('Y-m-d H:i:s'),
             $operacao,
             $entidade,
-            $registroId,
+            $registroId ?? 0,
             $sanitizedDetalhes
         );
 

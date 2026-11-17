@@ -137,18 +137,20 @@ final class ProjetoService
 
     public function atualizarStatusParticipante(int $participanteId, string $status, ?string $dataPresenca = null): bool
     {
-        $participantes = $this->projetoRepo->getParticipantes(0);
-        foreach ($participantes as $p) {
-            if ($p->id === $participanteId) {
-                $p->situacaoParticipacao = $status;
-                if ($status === 'Efetivamente Atendido') {
-                    $p->dataPresenca = $dataPresenca ?? date('Y-m-d');
-                }
-                $this->projetoRepo->updateParticipante($p);
-                $this->auditLog->log('Atualizar Participante', 'ParticipanteProjeto', $participanteId, "Status de participação alterado para [{$status}]");
-                return true;
-            }
+        $participante = $this->projetoRepo->findParticipanteById($participanteId);
+        if (!$participante) {
+            return false;
         }
-        return false;
+
+        $participante->situacaoParticipacao = $status;
+        if ($status === 'Efetivamente Atendido') {
+            $participante->dataPresenca = $dataPresenca ?? date('Y-m-d');
+        }
+
+        $ok = $this->projetoRepo->updateParticipante($participante);
+        if ($ok) {
+            $this->auditLog->log('Atualizar Participante', 'ParticipanteProjeto', $participanteId, "Status de participação alterado para [{$status}]");
+        }
+        return $ok;
     }
 }

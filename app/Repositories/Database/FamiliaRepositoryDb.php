@@ -40,7 +40,7 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
 
         if (!empty($filters['situacao'])) {
             $sql .= " AND f.status = :situacao";
-            $params['situacao'] = $filters['situacao'];
+            $params['situacao'] = $this->normalizeStatus($filters['situacao']);
         }
 
         if (!empty($filters['bairro'])) {
@@ -78,10 +78,9 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
     public function save(Familia $familia): Familia
     {
         if (empty($familia->codigo)) {
-            // Gera próximo código sequencial se ainda não possuir
             $stmtSeq = $this->db->query("SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM gestao_social.familias");
             $nextId = (int)$stmtSeq->fetchColumn();
-            $familia->codigo = sprintf('FAM-%03d', $nextId);
+            $familia->codigo = sprintf('FAM-%s-%04d', date('Y'), $nextId);
         }
 
         $cleanCep = preg_replace('/[^0-9]/', '', $familia->cep);
@@ -91,10 +90,12 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
 
         $sql = "INSERT INTO gestao_social.familias (
                     codigo_familia, nome_referencia, cep, logradouro, numero, complemento,
-                    bairro, municipio, uf, renda_familiar, despesas_mensais, situacao_moradia, status
+                    bairro, municipio, uf, renda_familiar, despesas_mensais, situacao_moradia, status,
+                    observacoes, historico_alteracoes
                 ) VALUES (
                     :codigo, :nome, :cep, :logradouro, :numero, :complemento,
-                    :bairro, :municipio, :uf, :renda, :despesas, :moradia, :status
+                    :bairro, :municipio, :uf, :renda, :despesas, :moradia, :status,
+                    :observacoes, :historico::jsonb
                 ) RETURNING id, data_cadastro";
 
         $stmt = $this->db->prepare($sql);
@@ -112,6 +113,8 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
             'despesas' => $familia->despesasMensais,
             'moradia' => $this->normalizeMoradia($familia->situacaoMoradia),
             'status' => $this->normalizeStatus($familia->situacaoCadastral),
+            'observacoes' => $familia->observacoes,
+            'historico' => json_encode($familia->historicoAlteracoes, JSON_UNESCAPED_UNICODE) ?: '[]',
         ]);
 
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -140,7 +143,9 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
                     renda_familiar = :renda,
                     despesas_mensais = :despesas,
                     situacao_moradia = :moradia,
-                    status = :status
+                    status = :status,
+                    observacoes = :observacoes,
+                    historico_alteracoes = :historico::jsonb
                 WHERE id = :id";
 
         $stmt = $this->db->prepare($sql);
@@ -158,6 +163,8 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
             'despesas' => $familia->despesasMensais,
             'moradia' => $this->normalizeMoradia($familia->situacaoMoradia),
             'status' => $this->normalizeStatus($familia->situacaoCadastral),
+            'observacoes' => $familia->observacoes,
+            'historico' => json_encode($familia->historicoAlteracoes, JSON_UNESCAPED_UNICODE) ?: '[]',
         ]);
     }
 
@@ -166,7 +173,7 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
         $sql = "SELECT fi.*, 
                        p.nome_completo, p.nome_social, p.data_nascimento, p.cpf, 
                        p.telefone, p.escolaridade, p.ocupacao, p.situacao_ocupacional, 
-                       p.observacoes AS pessoa_obs, p.status AS pessoa_status
+                       p.observacoes AS pessoa_obs, p.status AS pessoa_status, p.data_cadastro AS pessoa_data_cadastro
                   FROM gestao_social.familia_integrantes fi
                   JOIN gestao_social.pessoas p ON p.id = fi.pessoa_id
                  WHERE fi.familia_id = :familia_id";
@@ -181,37 +188,24 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
         $stmt->execute(['familia_id' => $familiaId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $vinculos = [];
-        foreach ($rows as $row) {
-            $pessoa = new Pessoa(
-                (int)$row['pessoa_id'],
-                $row['nome_completo'],
-                $row['nome_social'],
-                $row['data_nascimento'] ?? '',
-                $row['cpf'],
-                $row['telefone'],
-                $row['escolaridade'] ?? 'Não informado',
-                $row['ocupacao'],
-                $row['situacao_ocupacional'] ?? 'Desempregado',
-                $row['pessoa_obs'],
-                $row['pessoa_status'] ?? 'Ativo'
-            );
+        return array_map(fn(array $row) => $this->mapVinculoRow($row), $rows);
+    }
 
-            $vinculos[] = new VinculoFamiliar(
-                (int)$row['id'],
-                (int)$row['familia_id'],
-                (int)$row['pessoa_id'],
-                $row['parentesco'],
-                (bool)$row['responsavel_familiar'],
-                $row['data_inicio'],
-                $row['data_fim'],
-                $row['data_fim'] === null,
-                $row['observacoes'],
-                $pessoa
-            );
-        }
+    public function findVinculoById(int $vinculoId): ?VinculoFamiliar
+    {
+        $sql = "SELECT fi.*, 
+                       p.nome_completo, p.nome_social, p.data_nascimento, p.cpf, 
+                       p.telefone, p.escolaridade, p.ocupacao, p.situacao_ocupacional, 
+                       p.observacoes AS pessoa_obs, p.status AS pessoa_status, p.data_cadastro AS pessoa_data_cadastro
+                  FROM gestao_social.familia_integrantes fi
+                  JOIN gestao_social.pessoas p ON p.id = fi.pessoa_id
+                 WHERE fi.id = :id";
 
-        return $vinculos;
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['id' => $vinculoId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? $this->mapVinculoRow($row) : null;
     }
 
     public function addIntegrante(VinculoFamiliar $vinculo): VinculoFamiliar
@@ -270,7 +264,7 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
 
         if (!empty($filters['situacao'])) {
             $sql .= " AND f.status = :situacao";
-            $params['situacao'] = $filters['situacao'];
+            $params['situacao'] = $this->normalizeStatus($filters['situacao']);
         }
 
         $stmt = $this->db->prepare($sql);
@@ -291,11 +285,52 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
         return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
+    private function mapVinculoRow(array $row): VinculoFamiliar
+    {
+        $pessoa = new Pessoa(
+            (int)$row['pessoa_id'],
+            $row['nome_completo'],
+            $row['nome_social'],
+            $row['data_nascimento'] ?? '',
+            $row['cpf'],
+            $row['telefone'],
+            $row['escolaridade'] ?? 'Não informado',
+            $row['ocupacao'],
+            $row['situacao_ocupacional'] ?? 'Desempregado',
+            $row['pessoa_obs'],
+            $row['pessoa_status'] ?? 'Ativo',
+            !empty($row['pessoa_data_cadastro']) ? substr((string)$row['pessoa_data_cadastro'], 0, 10) : null
+        );
+
+        return new VinculoFamiliar(
+            (int)$row['id'],
+            (int)$row['familia_id'],
+            (int)$row['pessoa_id'],
+            $row['parentesco'],
+            (bool)$row['responsavel_familiar'],
+            $row['data_inicio'],
+            $row['data_fim'],
+            $row['data_fim'] === null,
+            $row['observacoes'],
+            $pessoa
+        );
+    }
+
     private function mapRowToModel(array $row): Familia
     {
         $cep = (string)($row['cep'] ?? '');
         if (strlen($cep) === 8) {
             $cep = substr($cep, 0, 5) . '-' . substr($cep, 5, 3);
+        }
+
+        $historico = [];
+        if (!empty($row['historico_alteracoes'])) {
+            $decoded = is_string($row['historico_alteracoes'])
+                ? json_decode($row['historico_alteracoes'], true)
+                : $row['historico_alteracoes'];
+            if (is_array($decoded)) {
+                $historico = $decoded;
+            }
         }
 
         return new Familia(
@@ -315,8 +350,8 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
             $row['situacao_moradia'],
             substr((string)$row['data_cadastro'], 0, 10),
             $row['status'],
-            null,
-            []
+            $row['observacoes'] ?? null,
+            $historico
         );
     }
 
@@ -327,7 +362,7 @@ final class FamiliaRepositoryDb implements FamiliaRepositoryInterface
             'ativa', 'ativo' => 'Ativa',
             'suspensa', 'suspenso' => 'Suspensa',
             'encerrada', 'encerrado' => 'Encerrada',
-            default => 'Ativa'
+            default => 'Em análise',
         };
     }
 

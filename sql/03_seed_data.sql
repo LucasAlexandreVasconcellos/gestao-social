@@ -25,44 +25,37 @@ INSERT INTO gestao_social.perfis (nome, descricao) VALUES
 ('Coordenação', 'Acesso a relatórios estratégicos, ações sociais e gestão de equipe'),
 ('Assistente Social', 'Acesso completo ao cadastro social, avaliações, atendimentos e pareceres técnicos'),
 ('Estoque', 'Acesso à gestão de entradas, saídas, produtos e registro de doações físicas'),
-('Atendimento / Recepção', 'Acesso à recepção de famílias e triagem inicial de atendimentos')
+('Atendimento / Recepção', 'Acesso à recepção de famílias e triagem inicial de atendimentos'),
+('Consulta', 'Acesso somente leitura para auditoria externa e consulta de indicadores')
 ON CONFLICT (nome) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- 2. USUÁRIOS DE DEMONSTRAÇÃO (Idempotente via ON CONFLICT no login)
 -- -----------------------------------------------------------------------------
-INSERT INTO gestao_social.usuarios (nome, email, login, senha_hash, perfil_id) VALUES
+INSERT INTO gestao_social.usuarios (nome, email, login, senha_hash, perfil_id, trocar_senha_obrigatorio) VALUES
 ('Administrador Geral', 'admin@gestaosocial.org', 'admin', 
- gestao_social.crypt('admin123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Administrador')),
-
-('Administrador Institucional', 'admin@entidade.org.br', 'admin.entidade', 
- gestao_social.crypt('admin123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Administrador')),
-
-('Ana Paula Silva (Assistente Social)', 'social@gestaosocial.org', 'social', 
- gestao_social.crypt('social123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Assistente Social')),
+ gestao_social.crypt('Admin@2026!Gov', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Administrador'), TRUE),
 
 ('Maria Clara Santos', 'maria.clara@entidade.org.br', 'maria.social', 
- gestao_social.crypt('Social@123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Assistente Social')),
-
-('Robson Almoxarife', 'estoque@gestaosocial.org', 'estoque', 
- gestao_social.crypt('estoque123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Estoque')),
+ gestao_social.crypt('Social@2026!Gov', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Assistente Social'), TRUE),
 
 ('Carlos Eduardo Lima', 'carlos.estoque@entidade.org.br', 'carlos.estoque', 
- gestao_social.crypt('Estoque@123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Estoque')),
+ gestao_social.crypt('Estoque@2026!Gov', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Estoque'), TRUE),
 
 ('Fernanda Coordenadora', 'coordenacao@gestaosocial.org', 'coordenacao', 
- gestao_social.crypt('admin123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Coordenação')),
+ gestao_social.crypt('Coord@2026!Gov', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Coordenação'), TRUE),
 
 ('Juliana Recepção', 'atendimento@gestaosocial.org', 'atendimento', 
- gestao_social.crypt('social123', gestao_social.gen_salt('bf', 10)), 
- (SELECT id FROM gestao_social.perfis WHERE nome = 'Atendimento / Recepção'))
+ gestao_social.crypt('Recep@2026!Gov', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Atendimento / Recepção'), TRUE),
+
+('Carlos Auditor Externo', 'consulta@gestaosocial.org', 'consulta', 
+ gestao_social.crypt('Audit@2026!Gov', gestao_social.gen_salt('bf', 10)), 
+ (SELECT id FROM gestao_social.perfis WHERE nome = 'Consulta'), TRUE)
 ON CONFLICT (login) DO NOTHING;
 
 -- -----------------------------------------------------------------------------

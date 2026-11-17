@@ -40,12 +40,13 @@
         <div class="form-group col-3">
           <label class="form-label" for="unidadeMedida">Unidade de Medida <span class="required">*</span></label>
           <select id="unidadeMedida" name="unidadeMedida" class="form-select" required>
-            <option value="Unidade">Unidade (un)</option>
-            <option value="Pacote">Pacote (pct)</option>
-            <option value="Kg">Quilograma (kg)</option>
-            <option value="Litro">Litro (l)</option>
-            <option value="Fardo">Fardo</option>
-            <option value="Caixa">Caixa (cx)</option>
+            <option value="UN">Unidade (UN)</option>
+            <option value="PCT">Pacote (PCT)</option>
+            <option value="KG">Quilograma (KG)</option>
+            <option value="LITRO">Litro (LITRO)</option>
+            <option value="CX">Caixa (CX)</option>
+            <option value="LATA">Lata (LATA)</option>
+            <option value="KIT">Kit (KIT)</option>
           </select>
         </div>
 

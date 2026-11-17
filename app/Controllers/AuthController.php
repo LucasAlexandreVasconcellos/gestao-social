@@ -19,7 +19,8 @@ final class AuthController
     public function login(Request $request): string
     {
         return View::render('auth/login', [
-            'error' => Session::flash('error')
+            'error' => Session::flash('error'),
+            'info' => Session::flash('info'),
         ], 'layouts/auth');
     }
 
@@ -43,7 +44,7 @@ final class AuthController
         $success = $this->authService->login($email, $password);
 
         if (!$success) {
-            Session::flash('error', 'Credenciais inválidas ou usuário inativo no sistema.');
+            Session::flash('error', $this->authService->getLastLoginError() ?? 'Credenciais inválidas ou usuário inativo no sistema.');
             Response::redirect('/login');
             return;
         }
@@ -53,7 +54,14 @@ final class AuthController
             return;
         }
 
-        Session::flash('success', 'Bem-vindo à Plataforma de Gestão Social e Assistencial!');
+        $user = $this->authService->getCurrentUser();
+        if ($user && $user->trocarSenhaObrigatorio) {
+            Session::flash('info', 'Por política de segurança institucional, defina uma nova senha pessoal para continuar.');
+            Response::redirect('/meu-perfil/senha');
+            return;
+        }
+
+        Session::flash('success', 'Sessão autenticada na Plataforma de Gestão Socioassistencial.');
         Response::redirect('/dashboard');
     }
 
@@ -93,8 +101,20 @@ final class AuthController
         $valid = $this->authService->verify2faLogin($code, $isBackup);
 
         if ($valid) {
+            $user = $this->authService->getCurrentUser();
+            if ($user && $user->trocarSenhaObrigatorio) {
+                Session::flash('info', 'Autenticação 2FA validada. Defina uma nova senha pessoal para concluir o primeiro acesso.');
+                Response::redirect('/meu-perfil/senha');
+                return;
+            }
             Session::flash('success', 'Autenticação em dois fatores confirmada com sucesso!');
             Response::redirect('/dashboard');
+            return;
+        }
+
+        if (!$this->authService->hasPending2fa()) {
+            Session::flash('error', 'Número máximo de tentativas de 2FA excedido. Realize o login novamente.');
+            Response::redirect('/login');
             return;
         }
 
@@ -107,6 +127,49 @@ final class AuthController
         $this->authService->cancelPending2fa();
         Session::flash('info', 'Autenticação cancelada.');
         Response::redirect('/login');
+    }
+
+    public function changePasswordForm(Request $request): string
+    {
+        $user = $this->authService->getCurrentUser();
+        if (!$user) {
+            Response::redirect('/login');
+            return '';
+        }
+
+        return View::render('auth/change_password', [
+            'user' => $user,
+            'obrigatoria' => $user->trocarSenhaObrigatorio,
+            'errors' => Session::flash('errors') ?? [],
+            'error' => Session::flash('error'),
+            'info' => Session::flash('info'),
+            'success' => Session::flash('success')
+        ]);
+    }
+
+    public function changePassword(Request $request): void
+    {
+        $user = $this->authService->getCurrentUser();
+        if (!$user) {
+            Response::redirect('/login');
+            return;
+        }
+
+        $current = (string)$request->post('senhaAtual', '');
+        $new = (string)$request->post('novaSenha', '');
+        $confirm = (string)$request->post('confirmarSenha', '');
+
+        $result = $this->authService->changePassword($user->id, $current, $new, $confirm, true);
+
+        if (!$result['success']) {
+            Session::flash('errors', $result['errors'] ?? []);
+            Session::flash('error', 'Verifique os critérios de segurança da nova senha.');
+            Response::redirect('/meu-perfil/senha');
+            return;
+        }
+
+        Session::flash('success', 'Senha alterada com sucesso!');
+        Response::redirect('/dashboard');
     }
 
     public function twoFactorProfile(Request $request): string
@@ -151,7 +214,7 @@ final class AuthController
         if ($ok) {
             Session::flash('success', 'Segundo Fator de Autenticação (2FA / TOTP) ativado com sucesso!');
         } else {
-            Session::flash('error', 'Código TOTP incorreto. Verifique o relógio do seu smartphone e digite os 6 dígitos gerados pelo autenticador.');
+            Session::flash('error', 'Código TOTP incorreto. Verifique o relógio do seu dispositivo e digite os 6 dígitos gerados pelo autenticador.');
         }
 
         Response::redirect('/meu-perfil/2fa');
@@ -165,8 +228,19 @@ final class AuthController
             return;
         }
 
-        $this->authService->disableTwoFactor($user->id);
-        Session::flash('info', 'Autenticação em dois fatores desativada com sucesso.');
+        $senhaAtual = (string)$request->post('senhaAtual', '');
+        if ($senhaAtual === '') {
+            Session::flash('error', 'Informe sua senha atual para confirmar a desativação do 2FA.');
+            Response::redirect('/meu-perfil/2fa');
+            return;
+        }
+
+        $res = $this->authService->disableTwoFactor($user->id, $senhaAtual);
+        if (!$res['success']) {
+            Session::flash('error', $res['error'] ?? 'Não foi possível desativar o 2FA.');
+        } else {
+            Session::flash('info', 'Autenticação em dois fatores desativada com sucesso.');
+        }
         Response::redirect('/meu-perfil/2fa');
     }
 

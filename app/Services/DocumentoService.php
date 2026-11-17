@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Contracts\Repositories\DocumentoRepositoryInterface;
 use App\Models\Documento;
+use App\Models\Usuario;
 
 final class DocumentoService
 {
@@ -78,7 +79,6 @@ final class DocumentoService
         if (function_exists('finfo_open')) {
             $finfo = finfo_open(FILEINFO_MIME_TYPE);
             $mime = finfo_file($finfo, $tmpName) ?: '';
-            finfo_close($finfo);
         }
         if (empty($mime) || $mime === 'application/octet-stream') {
             $mime = match ($ext) {
@@ -122,7 +122,8 @@ final class DocumentoService
             mimeType: $mime,
             tamanhoBytes: $size,
             usuarioUploadId: $usuarioId,
-            dataUpload: date('Y-m-d H:i:s')
+            dataUpload: date('Y-m-d H:i:s'),
+            hashSha256: $fileHash
         );
 
         $savedDoc = $this->documentoRepo->save($doc);
@@ -169,6 +170,28 @@ final class DocumentoService
             'mimeType' => $doc->mimeType,
             'size' => filesize($filePath) ?: $doc->tamanhoBytes
         ];
+    }
+
+    public function canAccessDocumento(Documento $doc, ?Usuario $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        // Laudos médicos / PCD exigem permissão para dados sensíveis (LGPD Art. 11)
+        if ($doc->tipoDocumento === 'laudo_medico_pcd') {
+            return $user->can('avaliacoes.sensitive');
+        }
+
+        $entidade = mb_strtolower($doc->entidadeTipo, 'UTF-8');
+        return match ($entidade) {
+            'familia', 'pessoa' => $user->can('familias.view'),
+            'atendimento' => $user->can('atendimentos.view'),
+            'beneficio' => $user->can('beneficios.view'),
+            'doacao' => $user->can('doacoes.view'),
+            'avaliacao' => $user->can('avaliacoes.sensitive') || $user->can('familias.view'),
+            default => $user->can('familias.view') || $user->can('usuarios.manage')
+        };
     }
 
     public function excluir(int $id, ?int $usuarioId = null): bool

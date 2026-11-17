@@ -8,6 +8,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\View;
+use App\Helpers\PaginationHelper;
 use App\Services\DocumentoService;
 use App\Services\PessoaService;
 
@@ -22,9 +23,12 @@ final class PessoaController
     {
         $filters = ['search' => $request->query('search')];
         $pessoas = $this->pessoaService->listar($filters);
+        $page = max(1, (int)$request->query('page', 1));
+        $pag = PaginationHelper::paginate($pessoas, $page, 15);
 
         return View::render('pessoas/index', [
-            'pessoas' => $pessoas,
+            'pessoas' => $pag['items'],
+            'pagination' => $pag,
             'filters' => $filters
         ]);
     }

@@ -212,7 +212,8 @@ final class PessoaRepositoryDb implements PessoaRepositoryInterface
             $row['ocupacao'],
             $row['situacao_ocupacional'] ?? 'Desempregado',
             $row['observacoes'],
-            $row['status'] ?? 'Ativo'
+            $row['status'] ?? 'Ativo',
+            isset($row['data_cadastro']) ? substr((string)$row['data_cadastro'], 0, 10) : null
         );
     }
 

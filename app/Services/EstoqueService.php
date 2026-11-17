@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Repositories\EstoqueRepositoryInterface;
+use App\Core\Session;
 use App\Models\MovimentacaoEstoque;
 use App\Models\Produto;
 use App\Validators\FormValidator;
@@ -77,6 +78,27 @@ final class EstoqueService
         );
 
         $saved = $this->estoqueRepo->saveProduto($produto);
+
+        // Em repositório DB, saldo inicial vem de movimentacoes_estoque (view vw_saldo_estoque)
+        $isDemo = defined(get_class($this->estoqueRepo) . '::IS_DEMO');
+        if (!$isDemo && $estoqueInicial > 0) {
+            $user = Session::get('user');
+            $movInicial = new MovimentacaoEstoque(
+                0,
+                date('Y-m-d'),
+                $saved->id,
+                $saved->nome,
+                'Entrada',
+                $estoqueInicial,
+                null,
+                $saved->proximoVencimento,
+                'Saldo Inicial',
+                'Saldo inicial informado no cadastro do item',
+                $user['nome'] ?? 'Almoxarife'
+            );
+            $this->estoqueRepo->saveMovimentacao($movInicial);
+        }
+
         $this->auditLog->log('Criar', 'Produto', $saved->id, "Cadastro do produto {$saved->nome}");
 
         return ['success' => true, 'produto' => $saved];
@@ -89,7 +111,7 @@ final class EstoqueService
             ->required('produtoId', 'Produto')
             ->numeric('produtoId', 'Produto')
             ->required('tipo', 'Tipo de Movimentação')
-            ->inList('tipo', ['Entrada', 'Saída', 'Ajuste', 'Perda'], 'Tipo de Movimentação')
+            ->inList('tipo', ['Entrada', 'Saída', 'Ajuste Positivo', 'Ajuste Negativo', 'Ajuste', 'Perda'], 'Tipo de Movimentação')
             ->required('quantidade', 'Quantidade')
             ->numeric('quantidade', 'Quantidade')
             ->min('quantidade', 0.01, 'Quantidade')
@@ -109,8 +131,8 @@ final class EstoqueService
         $qtd = (float)str_replace(',', '.', (string)$dados['quantidade']);
         $tipo = trim($dados['tipo']);
 
-        // Se for saída e quantidade for maior que estoque atual
-        if ($tipo === 'Saída' && $qtd > $produto->estoqueAtual) {
+        // Bloqueia saída/baixa maior que estoque atual
+        if (in_array($tipo, ['Saída', 'Perda', 'Ajuste Negativo'], true) && $qtd > $produto->estoqueAtual) {
             return [
                 'success' => false,
                 'errors' => ['quantidade' => "Quantidade insuficiente em estoque. Saldo disponível: {$produto->estoqueAtual} {$produto->unidadeMedida}."]
@@ -131,7 +153,11 @@ final class EstoqueService
             trim($dados['responsavel'])
         );
 
-        $saved = $this->estoqueRepo->saveMovimentacao($mov);
+        try {
+            $saved = $this->estoqueRepo->saveMovimentacao($mov);
+        } catch (\Throwable $e) {
+            return ['success' => false, 'errors' => ['geral' => 'Erro ao registrar movimentação: ' . $e->getMessage()]];
+        }
 
         $this->auditLog->log(
             'Movimentar Estoque',

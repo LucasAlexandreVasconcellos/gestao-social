@@ -1,47 +1,83 @@
 <?php
-/** @var array $usuarios */
-/** @var string|null $error */
+use App\Helpers\CsrfHelper;
+use App\Helpers\IconHelper;
+
+$orgTitle = $orgName ?? 'Secretaria Municipal de Assistência Social';
+$unitTitle = $unitName ?? 'Gestão Socioassistencial — SUAS';
 ?>
-<div class="card" style="box-shadow: var(--shadow-lg);">
-  <div style="background-color: var(--primary); color: #ffffff; padding: 24px; text-align: center; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-    <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="margin-bottom: 8px;">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-      <circle cx="9" cy="7" r="4"></circle>
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-    </svg>
-    <h2 style="font-size: 20px; font-weight: 700;">Gestão Social & Assistencial</h2>
-    <p style="font-size: 13px; opacity: 0.85; margin-top: 4px;">Acesso ao Painel Institucional Oficial</p>
+<div class="auth-shell">
+  <div class="auth-civic-panel">
+    <div>
+      <div class="auth-civic-seal">
+        <?= IconHelper::svg('building', 22) ?>
+      </div>
+      <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #93B4DA; font-weight: 700; margin-bottom: 6px;">
+        Plataforma Governamental SUAS
+      </div>
+      <h1><?= $e($orgTitle) ?></h1>
+      <p><?= $e($unitTitle) ?> — Prontuário familiar unificado, concessão auditável de benefícios e governança LGPD.</p>
+    </div>
+
+    <ul class="auth-civic-pillars">
+      <li>
+        <?= IconHelper::svg('shield-check', 16) ?>
+        <span>Controle de acesso por perfil funcional (RBAC estrito)</span>
+      </li>
+      <li>
+        <?= IconHelper::svg('file-text', 16) ?>
+        <span>Trilha de auditoria imutável em PostgreSQL</span>
+      </li>
+      <li>
+        <?= IconHelper::svg('qr-code', 16) ?>
+        <span>Termos e recibos PDF assinados por HMAC-SHA256</span>
+      </li>
+    </ul>
   </div>
 
-  <div class="card-body" style="padding: 24px;">
+  <div class="auth-form-panel">
+    <div class="mb-4">
+      <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">Acesso Institucional</h2>
+      <p class="text-muted" style="font-size: 0.86rem; margin-top: 4px;">Entre com suas credenciais funcionais autorizadas.</p>
+    </div>
+
     <?php if (!empty($error)): ?>
-      <div class="alert alert-danger" style="margin-bottom: 16px;">
-        <span><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></span>
+      <div class="alert alert-danger" role="alert">
+        <?= IconHelper::svg('x-circle', 18) ?>
+        <div><?= $e($error) ?></div>
       </div>
     <?php endif; ?>
 
-    <form action="/login" method="POST">
-      <?= \App\Core\View::render('partials/csrf', [], null) ?>
+    <?php if (!empty($info)): ?>
+      <div class="alert alert-info" role="status">
+        <?= IconHelper::svg('info', 18) ?>
+        <div><?= $e($info) ?></div>
+      </div>
+    <?php endif; ?>
 
-      <div class="form-group" style="margin-bottom: 16px;">
-        <label class="form-label" for="email">E-mail Institucional ou Login</label>
-        <input type="text" id="email" name="email" class="form-control" placeholder="usuario@gestaosocial.org" required autofocus autocomplete="username">
+    <form method="POST" action="/login" autocomplete="on">
+      <?= CsrfHelper::input() ?>
+      <div class="form-group">
+        <label class="form-label" for="email">E-mail institucional ou usuário <span class="required">*</span></label>
+        <input type="text" id="email" name="email" class="form-control" placeholder="servidor@orgao.gov.br" required autofocus autocomplete="username">
       </div>
 
-      <div class="form-group" style="margin-bottom: 20px;">
-        <label class="form-label" for="password">Senha de Acesso</label>
-        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
-        <span class="form-help">Autenticação individual com matriz de permissões RBAC e criptografia segura.</span>
+      <div class="form-group">
+        <label class="form-label" for="password">Senha de acesso <span class="required">*</span></label>
+        <input type="password" id="password" name="password" class="form-control" placeholder="Digite sua senha" required autocomplete="current-password">
       </div>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px; font-weight: 600;">
-        Entrar no Sistema
+      <button type="submit" class="btn btn-primary btn-block" style="padding: 10px 16px; margin-top: 8px;">
+        <?= IconHelper::svg('lock', 16) ?>
+        <span>Entrar no Sistema</span>
       </button>
     </form>
-  </div>
 
-  <div style="background-color: var(--bg-subtle); padding: 14px 20px; text-align: center; font-size: 11px; color: var(--text-muted); border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-top: 1px solid var(--border-color);">
-    <span>Ambiente Oficial • Banco: <strong>obras</strong> (schema: <strong>gestao_social</strong>)</span>
+    <div class="mt-4 pt-3" style="border-top: 1px solid var(--border); padding-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <a href="/validar" style="font-size: 0.83rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <?= IconHelper::svg('qr-code', 15) ?>
+        <span>Validar Documento por QR Code</span>
+      </a>
+      <span class="text-muted" style="font-size: 0.76rem;">Acesso monitorado e auditado</span>
+    </div>
   </div>
 </div>
